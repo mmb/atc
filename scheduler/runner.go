@@ -34,6 +34,7 @@ type Runner struct {
 	Interval time.Duration
 }
 
+// runs tick() on an interval
 func (runner *Runner) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	close(ready)
 
@@ -64,6 +65,7 @@ dance:
 	return nil
 }
 
+// acquires a lease, loads versionsdb, calls schedule for each job
 func (runner *Runner) tick(logger lager.Logger) error {
 	config, _, found, err := runner.DB.GetConfig()
 	if err != nil {
@@ -130,6 +132,7 @@ func (runner *Runner) tick(logger lager.Logger) error {
 	return nil
 }
 
+// try next pending build, then try new build (why serial?)
 func (runner *Runner) schedule(logger lager.Logger, versions *algorithm.VersionsDB, job atc.JobConfig, resources atc.ResourceConfigs, resourceTypes atc.ResourceTypes) {
 	runner.Scheduler.TryNextPendingBuild(logger, versions, job, resources, resourceTypes).Wait()
 

@@ -72,6 +72,7 @@ func (s jobService) getBuildInputs(logger lager.Logger, build db.Build, buildPre
 			return nil, buildPrep, "failed-to-update-build-prep-with-inputs", err
 		}
 
+		//TODO
 		for _, input := range buildInputs {
 			scanLog := logger.Session("scan", lager.Data{
 				"input":    input.Name,

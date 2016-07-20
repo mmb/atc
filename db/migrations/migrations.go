@@ -111,4 +111,5 @@ var Migrations = []migration.Migrator{
 	MakeContainersExpiresAtNullable,
 	AddContainerIDToVolumes,
 	AddOnDeleteSetNullToFKeyContainerId,
+	AddIdealAndCompromiseInputVersions,
 }

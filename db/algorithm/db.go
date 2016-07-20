@@ -1,6 +1,9 @@
 package algorithm
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type VersionsDB struct {
 	ResourceVersions []ResourceVersion
@@ -25,8 +28,30 @@ type BuildOutput struct {
 
 type BuildInput struct {
 	ResourceVersion
-	BuildID int
-	JobID   int
+	BuildID   int
+	JobID     int
+	InputName string
+}
+
+func (db VersionsDB) IsVersionFirstOccurrence(versionID int, jobID int, inputName string) bool {
+	if len(db.BuildInputs) == 0 {
+		return true
+	}
+
+	for _, buildInput := range db.BuildInputs {
+		fmt.Printf("[mylog]: is version first occurrence. buildInput: {versionID: %d, jobID: %d, inputName: %s}, versionID: %d, jobID: %d, inputName: %s",
+			buildInput.VersionID, buildInput.JobID, buildInput.InputName,
+			versionID, jobID, inputName,
+		)
+		if buildInput.VersionID != versionID &&
+			buildInput.JobID == jobID &&
+			buildInput.InputName == inputName {
+			fmt.Println("[mylog] is first occurrence")
+			return true
+		}
+	}
+	fmt.Println("[mylog] not first occurrence")
+	return false
 }
 
 func (db VersionsDB) AllVersionsForResource(resourceID int) VersionCandidates {

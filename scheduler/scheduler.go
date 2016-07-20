@@ -23,6 +23,9 @@ type PipelineDB interface {
 
 	GetJobBuildForInputs(job string, inputs []db.BuildInput) (db.Build, bool, error)
 	GetNextPendingBuild(job string) (db.Build, bool, error)
+	GetAlgorithmInputConfigs(db *algorithm.VersionsDB, jobName string, inputs []config.JobInput) (algorithm.InputConfigs, error)
+	SaveIdealInputVersions(inputVersions algorithm.InputMapping, jobName string) error
+	SaveCompromiseInputVersions(inputVersions algorithm.InputMapping, jobName string) error
 
 	SaveResourceVersions(atc.ResourceConfig, []atc.Version) error
 }
@@ -64,53 +67,59 @@ type Scheduler struct {
 func (s *Scheduler) BuildLatestInputs(logger lager.Logger, versions *algorithm.VersionsDB, job atc.JobConfig, resources atc.ResourceConfigs, resourceTypes atc.ResourceTypes) error {
 	logger = logger.Session("build-latest")
 
-	inputs := config.JobInputs(job)
+	inputConfigs := config.JobInputs(job)
 
-	if len(inputs) == 0 {
-		// no inputs; no-op
-		return nil
-	}
-
-	latestInputs, found, _, err := s.PipelineDB.GetNextInputVersions(versions, job.Name, inputs)
+	algorithmInputConfigs, err := s.PipelineDB.GetAlgorithmInputConfigs(versions, job.Name, inputConfigs)
 	if err != nil {
-		logger.Error("failed-to-get-latest-input-versions", err)
+		logger.Error("failed-to-get-algorithm-input-configs", err)
 		return err
 	}
 
-	if !found {
-		logger.Debug("no-input-versions-available")
-		return nil
-	}
-
-	checkInputs := []db.BuildInput{}
-	for _, input := range latestInputs {
-		for _, ji := range inputs {
-			if ji.Name == input.Name {
-				if ji.Trigger {
-					checkInputs = append(checkInputs, input)
-				}
-
-				break
-			}
+	idealMapping := algorithm.InputMapping{}
+	for _, inputConfig := range algorithmInputConfigs {
+		singletonMapping, ok := algorithm.InputConfigs{inputConfig}.Resolve(versions)
+		if ok {
+			idealMapping[inputConfig.Name] = singletonMapping[inputConfig.Name]
 		}
 	}
 
-	if len(checkInputs) == 0 {
-		logger.Debug("no-triggered-input-versions")
-		return nil
-	}
-
-	existingBuild, found, err := s.PipelineDB.GetJobBuildForInputs(job.Name, checkInputs)
+	err = s.PipelineDB.SaveIdealInputVersions(idealMapping, job.Name)
 	if err != nil {
-		logger.Error("could-not-determine-if-inputs-are-already-used", err)
 		return err
 	}
 
-	if found {
-		logger.Debug("build-already-exists-for-inputs", lager.Data{
-			"existing-build": existingBuild.ID,
-		})
+	//if there is not an ideal version for every input
+	if len(idealMapping) < len(inputConfigs) { // important to not compare it to len(algorithmInputConfigs)
+		logger.Debug("[mylog]: no ideal version for every input")
+		return nil
+	}
 
+	compromiseMapping, ok := algorithmInputConfigs.Resolve(versions)
+	if !ok {
+		logger.Debug("[mylog]: err resolving compromise input versions")
+		err := s.PipelineDB.SaveCompromiseInputVersions(nil, job.Name)
+		return err
+	}
+
+	err = s.PipelineDB.SaveCompromiseInputVersions(compromiseMapping, job.Name)
+	if err != nil {
+		return err
+	}
+
+	trigger := false
+	for _, inputConfig := range inputConfigs {
+		//trigger: true, and the version has not been used
+		logger.Debug("[mylog]: trigger check", lager.Data{"trigger": inputConfig.Trigger, "firstOccurrence": compromiseMapping[inputConfig.Name].FirstOccurrence})
+		if inputConfig.Trigger && compromiseMapping[inputConfig.Name].FirstOccurrence {
+			trigger = true
+			break
+		}
+	}
+
+	logger.Debug("[mylog]: trigger", lager.Data{"trigger": trigger})
+
+	if !trigger {
+		logger.Debug("no-triggered-input-versions")
 		return nil
 	}
 
