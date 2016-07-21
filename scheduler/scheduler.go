@@ -64,7 +64,11 @@ type Scheduler struct {
 	Scanner    Scanner
 }
 
-func (s *Scheduler) BuildLatestInputs(logger lager.Logger, versions *algorithm.VersionsDB, job atc.JobConfig, resources atc.ResourceConfigs, resourceTypes atc.ResourceTypes) error {
+func (s *Scheduler) SaveIdealAndCompromiseInputVersions(
+	logger lager.Logger,
+	versions *algorithm.VersionsDB,
+	job atc.JobConfig,
+) (algorithm.InputMapping, error) {
 	logger = logger.Session("build-latest")
 
 	inputConfigs := config.JobInputs(job)
@@ -72,7 +76,7 @@ func (s *Scheduler) BuildLatestInputs(logger lager.Logger, versions *algorithm.V
 	algorithmInputConfigs, err := s.PipelineDB.GetAlgorithmInputConfigs(versions, job.Name, inputConfigs)
 	if err != nil {
 		logger.Error("failed-to-get-algorithm-input-configs", err)
-		return err
+		return algorithm.InputMapping{}, err
 	}
 
 	idealMapping := algorithm.InputMapping{}
@@ -85,34 +89,56 @@ func (s *Scheduler) BuildLatestInputs(logger lager.Logger, versions *algorithm.V
 
 	err = s.PipelineDB.SaveIdealInputVersions(idealMapping, job.Name)
 	if err != nil {
-		return err
+		return algorithm.InputMapping{}, err
 	}
 
 	//if there is not an ideal version for every input
 	if len(idealMapping) < len(inputConfigs) { // important to not compare it to len(algorithmInputConfigs)
 		logger.Debug("[mylog]: no ideal version for every input")
-		return nil
+		return algorithm.InputMapping{}, nil
 	}
 
 	compromiseMapping, ok := algorithmInputConfigs.Resolve(versions)
 	if !ok {
 		logger.Debug("[mylog]: err resolving compromise input versions")
 		err := s.PipelineDB.SaveCompromiseInputVersions(nil, job.Name)
-		return err
+		return algorithm.InputMapping{}, err
 	}
 
 	err = s.PipelineDB.SaveCompromiseInputVersions(compromiseMapping, job.Name)
 	if err != nil {
-		return err
+		return algorithm.InputMapping{}, err
 	}
 
-	trigger := false
-	for _, inputConfig := range inputConfigs {
-		//trigger: true, and the version has not been used
-		logger.Debug("[mylog]: trigger check", lager.Data{"trigger": inputConfig.Trigger, "firstOccurrence": compromiseMapping[inputConfig.Name].FirstOccurrence})
-		if inputConfig.Trigger && compromiseMapping[inputConfig.Name].FirstOccurrence {
-			trigger = true
-			break
+	return compromiseMapping, nil
+}
+
+func (s *Scheduler) maybeCreateAndScheduleBuild(
+	logger lager.Logger,
+	versions *algorithm.VersionsDB,
+	job atc.JobConfig,
+	resources atc.ResourceConfigs,
+	resourceTypes atc.ResourceTypes,
+	compromiseMapping algorithm.InputMapping,
+) error {
+	logger.Debug("[mylog] compromise-mapping", lager.Data{"mapping": compromiseMapping})
+
+	if len(compromiseMapping) == 0 {
+		return nil
+	}
+
+	inputConfigs := config.JobInputs(job)
+
+	trigger := true
+	if len(inputConfigs) > 0 {
+		for _, inputConfig := range inputConfigs {
+			trigger = false
+			//trigger: true, and the version has not been used
+			logger.Debug("[mylog]: trigger check", lager.Data{"trigger": inputConfig.Trigger, "firstOccurrence": compromiseMapping[inputConfig.Name].FirstOccurrence})
+			if inputConfig.Trigger && compromiseMapping[inputConfig.Name].FirstOccurrence {
+				trigger = true
+				break
+			}
 		}
 	}
 
@@ -140,40 +166,47 @@ func (s *Scheduler) BuildLatestInputs(logger lager.Logger, versions *algorithm.V
 
 	logger.Info("created-build")
 
-	jobService, err := NewJobService(job, s.PipelineDB, s.Scanner)
-	if err != nil {
-		logger.Error("failed-to-get-job-service", err)
-		return nil
-	}
+	// jobService, err := NewJobService(job, s.PipelineDB, s.Scanner)
+	// if err != nil {
+	// 	logger.Error("failed-to-get-job-service", err)
+	// 	return err
+	// }
 
 	// NOTE: this is intentionally serial within a scheduler tick, so that
 	// multiple ATCs don't do redundant work to determine a build's inputs.
-
-	s.ScheduleAndResumePendingBuild(logger, versions, build, job, resources, resourceTypes, jobService)
-
+	logger.Debug("[mylog] schedule and resume", lager.Data{"caller": "maybeCreateAndScheduleBuild"})
+	//s.ScheduleAndResumePendingBuild(logger, versions, build, job, resources, resourceTypes, jobService)
 	return nil
 }
 
 func (s *Scheduler) TryNextPendingBuild(logger lager.Logger, versions *algorithm.VersionsDB, job atc.JobConfig, resources atc.ResourceConfigs, resourceTypes atc.ResourceTypes) Waiter {
 	logger = logger.Session("try-next-pending")
+	compromiseInputMapping, err := s.SaveIdealAndCompromiseInputVersions(logger, versions, job)
+	if err != nil {
+		logger.Error("failed-to-save-ideal-and-compromise-inputs", err)
+	}
+
+	s.maybeCreateAndScheduleBuild(logger, versions, job, resources, resourceTypes, compromiseInputMapping)
 
 	wg := new(sync.WaitGroup)
 
 	wg.Add(1)
+
 	go func() {
 		defer wg.Done()
 
-		build, found, err := s.PipelineDB.GetNextPendingBuild(job.Name)
+		build, pendingBuildFound, err := s.PipelineDB.GetNextPendingBuild(job.Name)
 		if err != nil {
 			logger.Error("failed-to-get-next-pending-build", err)
 			return
 		}
 
-		if !found {
+		logger.Debug("[mylog] pending build found?", lager.Data{"found": pendingBuildFound})
+		if !pendingBuildFound {
 			return
 		}
 
-		logger = logger.WithData(lager.Data{"build-id": build.ID, "build-name": build.Name})
+		logger = logger.WithData(lager.Data{"[mylog] build-id": build.ID, "build-name": build.Name})
 
 		jobService, err := NewJobService(job, s.PipelineDB, s.Scanner)
 		if err != nil {
@@ -181,13 +214,33 @@ func (s *Scheduler) TryNextPendingBuild(logger lager.Logger, versions *algorithm
 			return
 		}
 
+		_, err = s.SaveIdealAndCompromiseInputVersions(logger, versions, job)
+		if err != nil {
+			logger.Error("failed-to-save-ideal-and-compromise-inputs", err)
+		}
+
+		logger.Debug("[mylog] func compromise input mapping", lager.Data{"mapping": compromiseInputMapping})
+		if len(compromiseInputMapping) == 0 {
+			return
+		}
+
+		logger.Debug("[mylog] schedule and resume", lager.Data{"caller": "main thread"})
+
 		s.ScheduleAndResumePendingBuild(logger, versions, build, job, resources, resourceTypes, jobService)
 	}()
+
+	//if !pendingBuildFound {
+	//}
 
 	return wg
 }
 
-func (s *Scheduler) TriggerImmediately(logger lager.Logger, job atc.JobConfig, resources atc.ResourceConfigs, resourceTypes atc.ResourceTypes) (db.Build, Waiter, error) {
+func (s *Scheduler) TriggerImmediately(
+	logger lager.Logger,
+	job atc.JobConfig,
+	resources atc.ResourceConfigs,
+	resourceTypes atc.ResourceTypes,
+) (db.Build, Waiter, error) {
 	logger = logger.Session("trigger-immediately", lager.Data{
 		"job": job.Name,
 	})
@@ -205,12 +258,31 @@ func (s *Scheduler) TriggerImmediately(logger lager.Logger, job atc.JobConfig, r
 		return db.Build{}, nil, err
 	}
 
+	versions, err := s.PipelineDB.LoadVersionsDB()
+	if err != nil {
+		return db.Build{}, nil, err
+	}
+
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-
+	//TODO fix this?
 	// do not block request on scanning input versions
 	go func() {
 		defer wg.Done()
+		logger.Debug("[mylog] schedule and resume", lager.Data{"caller": "triggerimmediately"})
+
+		compromiseInputMapping, err := s.SaveIdealAndCompromiseInputVersions(logger, versions, job)
+		if err != nil {
+			logger.Error("failed-to-save-ideal-and-compromise-inputs", err)
+		}
+
+		logger.Debug("[mylog] func compromise input mapping", lager.Data{"mapping": compromiseInputMapping})
+
+		jobBuildInputs := config.JobInputs(job)
+		if len(jobBuildInputs) > 0 && len(compromiseInputMapping) == 0 {
+			return
+		}
+
 		s.ScheduleAndResumePendingBuild(logger, nil, build, job, resources, resourceTypes, jobService)
 	}()
 
@@ -276,7 +348,15 @@ func (s *Scheduler) ScheduleAndResumePendingBuild(
 		return nil
 	}
 
-	inputs, canBuildBeScheduled, reason, err := jobService.CanBuildBeScheduled(logger, build, buildPrep, versions)
+	buildInputs, err := s.PipelineDB.GetCompromiseBuildInputs(job.Name)
+	if err != nil {
+		logger.Error("failed-to-get-compromise-build-inputs", err)
+		return nil
+	}
+
+	logger.Debug("[mylog] ideal build inputs", lager.Data{"inputs": buildInputs})
+
+	canBuildBeScheduled, reason, err := jobService.CanBuildBeScheduled(logger, build, buildPrep, versions, buildInputs)
 	if err != nil {
 		logger.Error("failed-to-schedule-build", err, lager.Data{
 			"reason": reason,
@@ -295,7 +375,9 @@ func (s *Scheduler) ScheduleAndResumePendingBuild(
 		return nil
 	}
 
-	plan, err := s.Factory.Create(job, resources, resourceTypes, inputs)
+	logger.Debug("[mylog] can build be scheduled", lager.Data{"can": canBuildBeScheduled})
+
+	plan, err := s.Factory.Create(job, resources, resourceTypes, buildInputs)
 	if err != nil {
 		// Don't use ErrorBuild because it logs a build event, and this build hasn't started
 		err := s.BuildsDB.FinishBuild(build.ID, build.PipelineID, db.StatusErrored)

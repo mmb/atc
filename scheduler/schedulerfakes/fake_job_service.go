@@ -11,38 +11,44 @@ import (
 )
 
 type FakeJobService struct {
-	CanBuildBeScheduledStub        func(logger lager.Logger, build db.Build, buildPrep db.BuildPreparation, versions *algorithm.VersionsDB) ([]db.BuildInput, bool, string, error)
+	CanBuildBeScheduledStub        func(logger lager.Logger, build db.Build, buildPrep db.BuildPreparation, versions *algorithm.VersionsDB, buildInputs []db.BuildInput) (bool, string, error)
 	canBuildBeScheduledMutex       sync.RWMutex
 	canBuildBeScheduledArgsForCall []struct {
-		logger    lager.Logger
-		build     db.Build
-		buildPrep db.BuildPreparation
-		versions  *algorithm.VersionsDB
+		logger      lager.Logger
+		build       db.Build
+		buildPrep   db.BuildPreparation
+		versions    *algorithm.VersionsDB
+		buildInputs []db.BuildInput
 	}
 	canBuildBeScheduledReturns struct {
-		result1 []db.BuildInput
-		result2 bool
-		result3 string
-		result4 error
+		result1 bool
+		result2 string
+		result3 error
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeJobService) CanBuildBeScheduled(logger lager.Logger, build db.Build, buildPrep db.BuildPreparation, versions *algorithm.VersionsDB) ([]db.BuildInput, bool, string, error) {
+func (fake *FakeJobService) CanBuildBeScheduled(logger lager.Logger, build db.Build, buildPrep db.BuildPreparation, versions *algorithm.VersionsDB, buildInputs []db.BuildInput) (bool, string, error) {
+	var buildInputsCopy []db.BuildInput
+	if buildInputs != nil {
+		buildInputsCopy = make([]db.BuildInput, len(buildInputs))
+		copy(buildInputsCopy, buildInputs)
+	}
 	fake.canBuildBeScheduledMutex.Lock()
 	fake.canBuildBeScheduledArgsForCall = append(fake.canBuildBeScheduledArgsForCall, struct {
-		logger    lager.Logger
-		build     db.Build
-		buildPrep db.BuildPreparation
-		versions  *algorithm.VersionsDB
-	}{logger, build, buildPrep, versions})
-	fake.recordInvocation("CanBuildBeScheduled", []interface{}{logger, build, buildPrep, versions})
+		logger      lager.Logger
+		build       db.Build
+		buildPrep   db.BuildPreparation
+		versions    *algorithm.VersionsDB
+		buildInputs []db.BuildInput
+	}{logger, build, buildPrep, versions, buildInputsCopy})
+	fake.recordInvocation("CanBuildBeScheduled", []interface{}{logger, build, buildPrep, versions, buildInputsCopy})
 	fake.canBuildBeScheduledMutex.Unlock()
 	if fake.CanBuildBeScheduledStub != nil {
-		return fake.CanBuildBeScheduledStub(logger, build, buildPrep, versions)
+		return fake.CanBuildBeScheduledStub(logger, build, buildPrep, versions, buildInputs)
 	} else {
-		return fake.canBuildBeScheduledReturns.result1, fake.canBuildBeScheduledReturns.result2, fake.canBuildBeScheduledReturns.result3, fake.canBuildBeScheduledReturns.result4
+		return fake.canBuildBeScheduledReturns.result1, fake.canBuildBeScheduledReturns.result2, fake.canBuildBeScheduledReturns.result3
 	}
 }
 
@@ -52,20 +58,19 @@ func (fake *FakeJobService) CanBuildBeScheduledCallCount() int {
 	return len(fake.canBuildBeScheduledArgsForCall)
 }
 
-func (fake *FakeJobService) CanBuildBeScheduledArgsForCall(i int) (lager.Logger, db.Build, db.BuildPreparation, *algorithm.VersionsDB) {
+func (fake *FakeJobService) CanBuildBeScheduledArgsForCall(i int) (lager.Logger, db.Build, db.BuildPreparation, *algorithm.VersionsDB, []db.BuildInput) {
 	fake.canBuildBeScheduledMutex.RLock()
 	defer fake.canBuildBeScheduledMutex.RUnlock()
-	return fake.canBuildBeScheduledArgsForCall[i].logger, fake.canBuildBeScheduledArgsForCall[i].build, fake.canBuildBeScheduledArgsForCall[i].buildPrep, fake.canBuildBeScheduledArgsForCall[i].versions
+	return fake.canBuildBeScheduledArgsForCall[i].logger, fake.canBuildBeScheduledArgsForCall[i].build, fake.canBuildBeScheduledArgsForCall[i].buildPrep, fake.canBuildBeScheduledArgsForCall[i].versions, fake.canBuildBeScheduledArgsForCall[i].buildInputs
 }
 
-func (fake *FakeJobService) CanBuildBeScheduledReturns(result1 []db.BuildInput, result2 bool, result3 string, result4 error) {
+func (fake *FakeJobService) CanBuildBeScheduledReturns(result1 bool, result2 string, result3 error) {
 	fake.CanBuildBeScheduledStub = nil
 	fake.canBuildBeScheduledReturns = struct {
-		result1 []db.BuildInput
-		result2 bool
-		result3 string
-		result4 error
-	}{result1, result2, result3, result4}
+		result1 bool
+		result2 string
+		result3 error
+	}{result1, result2, result3}
 }
 
 func (fake *FakeJobService) Invocations() map[string][][]interface{} {

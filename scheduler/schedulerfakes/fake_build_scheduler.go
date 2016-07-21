@@ -24,18 +24,6 @@ type FakeBuildScheduler struct {
 	tryNextPendingBuildReturns struct {
 		result1 scheduler.Waiter
 	}
-	BuildLatestInputsStub        func(lager.Logger, *algorithm.VersionsDB, atc.JobConfig, atc.ResourceConfigs, atc.ResourceTypes) error
-	buildLatestInputsMutex       sync.RWMutex
-	buildLatestInputsArgsForCall []struct {
-		arg1 lager.Logger
-		arg2 *algorithm.VersionsDB
-		arg3 atc.JobConfig
-		arg4 atc.ResourceConfigs
-		arg5 atc.ResourceTypes
-	}
-	buildLatestInputsReturns struct {
-		result1 error
-	}
 	TriggerImmediatelyStub        func(lager.Logger, atc.JobConfig, atc.ResourceConfigs, atc.ResourceTypes) (db.Build, scheduler.Waiter, error)
 	triggerImmediatelyMutex       sync.RWMutex
 	triggerImmediatelyArgsForCall []struct {
@@ -90,43 +78,6 @@ func (fake *FakeBuildScheduler) TryNextPendingBuildReturns(result1 scheduler.Wai
 	}{result1}
 }
 
-func (fake *FakeBuildScheduler) BuildLatestInputs(arg1 lager.Logger, arg2 *algorithm.VersionsDB, arg3 atc.JobConfig, arg4 atc.ResourceConfigs, arg5 atc.ResourceTypes) error {
-	fake.buildLatestInputsMutex.Lock()
-	fake.buildLatestInputsArgsForCall = append(fake.buildLatestInputsArgsForCall, struct {
-		arg1 lager.Logger
-		arg2 *algorithm.VersionsDB
-		arg3 atc.JobConfig
-		arg4 atc.ResourceConfigs
-		arg5 atc.ResourceTypes
-	}{arg1, arg2, arg3, arg4, arg5})
-	fake.recordInvocation("BuildLatestInputs", []interface{}{arg1, arg2, arg3, arg4, arg5})
-	fake.buildLatestInputsMutex.Unlock()
-	if fake.BuildLatestInputsStub != nil {
-		return fake.BuildLatestInputsStub(arg1, arg2, arg3, arg4, arg5)
-	} else {
-		return fake.buildLatestInputsReturns.result1
-	}
-}
-
-func (fake *FakeBuildScheduler) BuildLatestInputsCallCount() int {
-	fake.buildLatestInputsMutex.RLock()
-	defer fake.buildLatestInputsMutex.RUnlock()
-	return len(fake.buildLatestInputsArgsForCall)
-}
-
-func (fake *FakeBuildScheduler) BuildLatestInputsArgsForCall(i int) (lager.Logger, *algorithm.VersionsDB, atc.JobConfig, atc.ResourceConfigs, atc.ResourceTypes) {
-	fake.buildLatestInputsMutex.RLock()
-	defer fake.buildLatestInputsMutex.RUnlock()
-	return fake.buildLatestInputsArgsForCall[i].arg1, fake.buildLatestInputsArgsForCall[i].arg2, fake.buildLatestInputsArgsForCall[i].arg3, fake.buildLatestInputsArgsForCall[i].arg4, fake.buildLatestInputsArgsForCall[i].arg5
-}
-
-func (fake *FakeBuildScheduler) BuildLatestInputsReturns(result1 error) {
-	fake.BuildLatestInputsStub = nil
-	fake.buildLatestInputsReturns = struct {
-		result1 error
-	}{result1}
-}
-
 func (fake *FakeBuildScheduler) TriggerImmediately(arg1 lager.Logger, arg2 atc.JobConfig, arg3 atc.ResourceConfigs, arg4 atc.ResourceTypes) (db.Build, scheduler.Waiter, error) {
 	fake.triggerImmediatelyMutex.Lock()
 	fake.triggerImmediatelyArgsForCall = append(fake.triggerImmediatelyArgsForCall, struct {
@@ -170,8 +121,6 @@ func (fake *FakeBuildScheduler) Invocations() map[string][][]interface{} {
 	defer fake.invocationsMutex.RUnlock()
 	fake.tryNextPendingBuildMutex.RLock()
 	defer fake.tryNextPendingBuildMutex.RUnlock()
-	fake.buildLatestInputsMutex.RLock()
-	defer fake.buildLatestInputsMutex.RUnlock()
 	fake.triggerImmediatelyMutex.RLock()
 	defer fake.triggerImmediatelyMutex.RUnlock()
 	return fake.invocations

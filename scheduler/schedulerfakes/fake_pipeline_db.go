@@ -77,6 +77,26 @@ type FakePipelineDB struct {
 		result3 db.MissingInputReasons
 		result4 error
 	}
+	GetMissingInputReasonsStub        func(algorithmInputConfigs algorithm.InputConfigs, inputs []config.JobInput, idealMapping algorithm.InputMapping) (db.MissingInputReasons, error)
+	getMissingInputReasonsMutex       sync.RWMutex
+	getMissingInputReasonsArgsForCall []struct {
+		algorithmInputConfigs algorithm.InputConfigs
+		inputs                []config.JobInput
+		idealMapping          algorithm.InputMapping
+	}
+	getMissingInputReasonsReturns struct {
+		result1 db.MissingInputReasons
+		result2 error
+	}
+	GetIdealBuildInputsStub        func(jobName string) ([]db.BuildInput, error)
+	getIdealBuildInputsMutex       sync.RWMutex
+	getIdealBuildInputsArgsForCall []struct {
+		jobName string
+	}
+	getIdealBuildInputsReturns struct {
+		result1 []db.BuildInput
+		result2 error
+	}
 	UseInputsForBuildStub        func(buildID int, inputs []db.BuildInput) error
 	useInputsForBuildMutex       sync.RWMutex
 	useInputsForBuildArgsForCall []struct {
@@ -418,6 +438,81 @@ func (fake *FakePipelineDB) GetNextInputVersionsReturns(result1 []db.BuildInput,
 		result3 db.MissingInputReasons
 		result4 error
 	}{result1, result2, result3, result4}
+}
+
+func (fake *FakePipelineDB) GetMissingInputReasons(algorithmInputConfigs algorithm.InputConfigs, inputs []config.JobInput, idealMapping algorithm.InputMapping) (db.MissingInputReasons, error) {
+	var inputsCopy []config.JobInput
+	if inputs != nil {
+		inputsCopy = make([]config.JobInput, len(inputs))
+		copy(inputsCopy, inputs)
+	}
+	fake.getMissingInputReasonsMutex.Lock()
+	fake.getMissingInputReasonsArgsForCall = append(fake.getMissingInputReasonsArgsForCall, struct {
+		algorithmInputConfigs algorithm.InputConfigs
+		inputs                []config.JobInput
+		idealMapping          algorithm.InputMapping
+	}{algorithmInputConfigs, inputsCopy, idealMapping})
+	fake.recordInvocation("GetMissingInputReasons", []interface{}{algorithmInputConfigs, inputsCopy, idealMapping})
+	fake.getMissingInputReasonsMutex.Unlock()
+	if fake.GetMissingInputReasonsStub != nil {
+		return fake.GetMissingInputReasonsStub(algorithmInputConfigs, inputs, idealMapping)
+	} else {
+		return fake.getMissingInputReasonsReturns.result1, fake.getMissingInputReasonsReturns.result2
+	}
+}
+
+func (fake *FakePipelineDB) GetMissingInputReasonsCallCount() int {
+	fake.getMissingInputReasonsMutex.RLock()
+	defer fake.getMissingInputReasonsMutex.RUnlock()
+	return len(fake.getMissingInputReasonsArgsForCall)
+}
+
+func (fake *FakePipelineDB) GetMissingInputReasonsArgsForCall(i int) (algorithm.InputConfigs, []config.JobInput, algorithm.InputMapping) {
+	fake.getMissingInputReasonsMutex.RLock()
+	defer fake.getMissingInputReasonsMutex.RUnlock()
+	return fake.getMissingInputReasonsArgsForCall[i].algorithmInputConfigs, fake.getMissingInputReasonsArgsForCall[i].inputs, fake.getMissingInputReasonsArgsForCall[i].idealMapping
+}
+
+func (fake *FakePipelineDB) GetMissingInputReasonsReturns(result1 db.MissingInputReasons, result2 error) {
+	fake.GetMissingInputReasonsStub = nil
+	fake.getMissingInputReasonsReturns = struct {
+		result1 db.MissingInputReasons
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakePipelineDB) GetIdealBuildInputs(jobName string) ([]db.BuildInput, error) {
+	fake.getIdealBuildInputsMutex.Lock()
+	fake.getIdealBuildInputsArgsForCall = append(fake.getIdealBuildInputsArgsForCall, struct {
+		jobName string
+	}{jobName})
+	fake.recordInvocation("GetIdealBuildInputs", []interface{}{jobName})
+	fake.getIdealBuildInputsMutex.Unlock()
+	if fake.GetIdealBuildInputsStub != nil {
+		return fake.GetIdealBuildInputsStub(jobName)
+	} else {
+		return fake.getIdealBuildInputsReturns.result1, fake.getIdealBuildInputsReturns.result2
+	}
+}
+
+func (fake *FakePipelineDB) GetIdealBuildInputsCallCount() int {
+	fake.getIdealBuildInputsMutex.RLock()
+	defer fake.getIdealBuildInputsMutex.RUnlock()
+	return len(fake.getIdealBuildInputsArgsForCall)
+}
+
+func (fake *FakePipelineDB) GetIdealBuildInputsArgsForCall(i int) string {
+	fake.getIdealBuildInputsMutex.RLock()
+	defer fake.getIdealBuildInputsMutex.RUnlock()
+	return fake.getIdealBuildInputsArgsForCall[i].jobName
+}
+
+func (fake *FakePipelineDB) GetIdealBuildInputsReturns(result1 []db.BuildInput, result2 error) {
+	fake.GetIdealBuildInputsStub = nil
+	fake.getIdealBuildInputsReturns = struct {
+		result1 []db.BuildInput
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakePipelineDB) UseInputsForBuild(buildID int, inputs []db.BuildInput) error {
@@ -803,6 +898,10 @@ func (fake *FakePipelineDB) Invocations() map[string][][]interface{} {
 	defer fake.loadVersionsDBMutex.RUnlock()
 	fake.getNextInputVersionsMutex.RLock()
 	defer fake.getNextInputVersionsMutex.RUnlock()
+	fake.getMissingInputReasonsMutex.RLock()
+	defer fake.getMissingInputReasonsMutex.RUnlock()
+	fake.getIdealBuildInputsMutex.RLock()
+	defer fake.getIdealBuildInputsMutex.RUnlock()
 	fake.useInputsForBuildMutex.RLock()
 	defer fake.useInputsForBuildMutex.RUnlock()
 	fake.createJobBuildMutex.RLock()

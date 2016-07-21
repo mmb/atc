@@ -16,7 +16,6 @@ import (
 
 type BuildScheduler interface {
 	TryNextPendingBuild(lager.Logger, *algorithm.VersionsDB, atc.JobConfig, atc.ResourceConfigs, atc.ResourceTypes) Waiter
-	BuildLatestInputs(lager.Logger, *algorithm.VersionsDB, atc.JobConfig, atc.ResourceConfigs, atc.ResourceTypes) error
 	TriggerImmediately(lager.Logger, atc.JobConfig, atc.ResourceConfigs, atc.ResourceTypes) (db.Build, Waiter, error)
 }
 
@@ -135,9 +134,4 @@ func (runner *Runner) tick(logger lager.Logger) error {
 // try next pending build, then try new build (why serial?)
 func (runner *Runner) schedule(logger lager.Logger, versions *algorithm.VersionsDB, job atc.JobConfig, resources atc.ResourceConfigs, resourceTypes atc.ResourceTypes) {
 	runner.Scheduler.TryNextPendingBuild(logger, versions, job, resources, resourceTypes).Wait()
-
-	err := runner.Scheduler.BuildLatestInputs(logger, versions, job, resources, resourceTypes)
-	if err != nil {
-		logger.Error("failed-to-build-from-latest-inputs", err)
-	}
 }

@@ -68,6 +68,11 @@ type PipelineDB interface {
 
 	LoadVersionsDB() (*algorithm.VersionsDB, error)
 	GetNextInputVersions(versions *algorithm.VersionsDB, job string, inputs []config.JobInput) ([]BuildInput, bool, MissingInputReasons, error)
+	GetMissingInputReasons(
+		algorithmInputConfigs algorithm.InputConfigs,
+		inputs []config.JobInput,
+		idealMapping algorithm.InputMapping,
+	) (MissingInputReasons, error)
 	GetAlgorithmInputConfigs(db *algorithm.VersionsDB, jobName string, inputs []config.JobInput) (algorithm.InputConfigs, error)
 	SaveIdealInputVersions(inputVersions algorithm.InputMapping, jobName string) error
 	GetIdealBuildInputs(jobName string) ([]BuildInput, error)
@@ -1912,6 +1917,37 @@ func (pdb *pipelineDB) LoadVersionsDB() (*algorithm.VersionsDB, error) {
 	return db, nil
 }
 
+func (pdb *pipelineDB) GetMissingInputReasons(
+	algorithmInputConfigs algorithm.InputConfigs,
+	inputs []config.JobInput,
+	idealMapping algorithm.InputMapping,
+) (MissingInputReasons, error) {
+	algorithmInputNameSet := map[string]struct{}{}
+	for _, algorithmInputConfig := range algorithmInputConfigs {
+		algorithmInputNameSet[algorithmInputConfig.Name] = struct{}{}
+	}
+
+	missingInputReasons := MissingInputReasons{}
+	for _, input := range inputs {
+		if _, ok := algorithmInputNameSet[input.Name]; !ok {
+			versionJSON, err := json.Marshal(input.Version.Pinned)
+			if err != nil {
+				return nil, err
+			}
+
+			missingInputReasons.RegisterPinnedVersionUnavailable(input.Name, string(versionJSON))
+		} else if _, ok := idealMapping[input.Name]; !ok {
+			if len(input.Passed) > 0 {
+				missingInputReasons.RegisterPassedConstraint(input.Name)
+			} else {
+				missingInputReasons.RegisterNoVersions(input.Name)
+			}
+		}
+	}
+
+	return missingInputReasons, nil
+}
+
 func (pdb *pipelineDB) GetNextInputVersions(versions *algorithm.VersionsDB, job string, inputs []config.JobInput) ([]BuildInput, bool, MissingInputReasons, error) {
 	algorithmInputConfigs, err := pdb.GetAlgorithmInputConfigs(versions, job, inputs)
 	if err != nil {
@@ -1931,32 +1967,16 @@ func (pdb *pipelineDB) GetNextInputVersions(versions *algorithm.VersionsDB, job 
 		return nil, false, nil, err
 	}
 
-	algorithmInputNameSet := map[string]struct{}{}
-	for _, algorithmInputConfig := range algorithmInputConfigs {
-		algorithmInputNameSet[algorithmInputConfig.Name] = struct{}{}
-	}
-
-	missingInputReasons := MissingInputReasons{}
-	for _, input := range inputs {
-		if _, ok := algorithmInputNameSet[input.Name]; !ok {
-			versionJSON, err := json.Marshal(input.Version.Pinned)
-			if err != nil {
-				return nil, false, nil, err
-			}
-
-			missingInputReasons.RegisterPinnedVersionUnavailable(input.Name, string(versionJSON))
-		} else if _, ok := idealMapping[input.Name]; !ok {
-			if len(input.Passed) > 0 {
-				missingInputReasons.RegisterPassedConstraint(input.Name)
-			} else {
-				missingInputReasons.RegisterNoVersions(input.Name)
-			}
-		}
+	//diff start
+	missingInputReasons, err := pdb.GetMissingInputReasons(algorithmInputConfigs, inputs, idealMapping)
+	if err != nil {
+		return nil, false, nil, err
 	}
 
 	if len(idealMapping) < len(inputs) { // important to not compare it to len(algorithmInputConfigs)
 		return nil, false, missingInputReasons, nil
 	}
+	//diff end
 
 	compromiseMapping, ok := algorithmInputConfigs.Resolve(versions)
 	if !ok {
@@ -1971,7 +1991,7 @@ func (pdb *pipelineDB) GetNextInputVersions(versions *algorithm.VersionsDB, job 
 	if err != nil {
 		return nil, false, nil, err
 	}
-
+	//this only
 	buildInputs, err := pdb.GetIdealBuildInputs(job)
 	if err != nil {
 		return nil, false, nil, err
