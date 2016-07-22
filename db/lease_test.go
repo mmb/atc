@@ -66,6 +66,11 @@ var _ = Describe("Leases", func() {
 				},
 			},
 		},
+		Jobs: atc.JobConfigs{
+			{
+				Name: "some-job",
+			},
+		},
 	}
 
 	BeforeEach(func() {
@@ -113,6 +118,62 @@ var _ = Describe("Leases", func() {
 				time.Sleep(time.Second)
 
 				newLease, leased, err := pipelineDB.LeaseScheduling(logger, 1*time.Second)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(leased).To(BeTrue())
+
+				newLease.Break()
+			})
+		})
+	})
+
+	FDescribe("LeaseResourceCheckingForJob", func() {
+		BeforeEach(func() {
+			_, _, err := pipelineDB.GetResource("some-resource")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		Context("when there has been a check recently", func() {
+			It("gets the lease", func() {
+				lease, leased, err := pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Second)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(leased).To(BeTrue())
+
+				acquired, err := pipelineDB.LeaseResourceCheckingForJobAcquired("some-job")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(acquired).To(BeTrue())
+
+				lease.Break()
+
+				acquired, err = pipelineDB.LeaseResourceCheckingForJobAcquired("some-job")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(acquired).To(BeFalse())
+
+				lease, leased, err = pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Second)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(leased).To(BeTrue())
+
+				lease.Break()
+			})
+		})
+
+		Context("when there has not been a check recently", func() {
+			It("gets and keeps the lease and stops others from immediately getting it", func() {
+				lease, leased, err := pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Second)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(leased).To(BeTrue())
+
+				Consistently(func() bool {
+					_, leased, err = pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Second)
+					Expect(err).NotTo(HaveOccurred())
+
+					return leased
+				}, 1500*time.Millisecond, 100*time.Millisecond).Should(BeFalse())
+
+				lease.Break()
+
+				time.Sleep(time.Second)
+
+				newLease, leased, err := pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Second)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(leased).To(BeTrue())
 

@@ -64,6 +64,9 @@ type PipelineDB interface {
 	CreateJobBuild(job string) (Build, error)
 	CreateJobBuildForCandidateInputs(job string) (Build, bool, error)
 
+	LeaseResourceCheckingForJob(logger lager.Logger, job string, interval time.Duration) (Lease, bool, error)
+	LeaseResourceCheckingForJobAcquired(jobName string) (bool, error)
+
 	UseInputsForBuild(buildID int, inputs []BuildInput) error
 
 	LoadVersionsDB() (*algorithm.VersionsDB, error)
@@ -78,6 +81,7 @@ type PipelineDB interface {
 	GetIdealBuildInputs(jobName string) ([]BuildInput, error)
 	SaveCompromiseInputVersions(inputVersions algorithm.InputMapping, jobName string) error
 	GetCompromiseBuildInputs(jobName string) ([]BuildInput, error)
+	DeleteCompromiseInputVersions(jobName string) error
 
 	GetJobBuildForInputs(job string, inputs []BuildInput) (Build, bool, error)
 	GetNextPendingBuild(job string) (Build, bool, error)
@@ -465,6 +469,70 @@ func (pdb *pipelineDB) LeaseScheduling(logger lager.Logger, interval time.Durati
 	lease.KeepSigned(interval)
 
 	return lease, true, nil
+}
+
+func (pdb *pipelineDB) LeaseResourceCheckingForJob(logger lager.Logger, job string, interval time.Duration) (Lease, bool, error) {
+	lease := &lease{
+		conn: pdb.conn,
+		logger: logger.Session("lease", lager.Data{
+			"job_name": job,
+		}),
+		attemptSignFunc: func(tx Tx) (sql.Result, error) {
+			return tx.Exec(`
+					UPDATE jobs
+					SET resource_checking_expires_at = now() + ($3 || ' SECONDS')::INTERVAL
+					WHERE name = $1
+						AND pipeline_id = $2
+						AND resource_checking_expires_at <= now()
+				`, job, pdb.ID, interval.Seconds())
+		},
+		heartbeatFunc: func(tx Tx) (sql.Result, error) {
+			return tx.Exec(`
+					UPDATE jobs
+					SET resource_checking_expires_at = now() + ($3 || ' SECONDS')::INTERVAL
+					WHERE name = $1
+						AND pipeline_id = $2
+				`, job, pdb.ID, interval.Seconds())
+		},
+		breakFunc: func() {
+			_, err := pdb.conn.Exec(`
+					UPDATE jobs
+					SET resource_checking_expires_at = 'epoch'
+					WHERE name = $1
+						AND pipeline_id = $2
+				`, job, pdb.ID)
+			if err != nil {
+				logger.Error("failed-to-reset-checking-state", err)
+			}
+		},
+	}
+
+	renewed, err := lease.AttemptSign(interval)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if !renewed {
+		return nil, renewed, nil
+	}
+
+	lease.KeepSigned(interval)
+
+	return lease, true, nil
+}
+
+func (pdb *pipelineDB) LeaseResourceCheckingForJobAcquired(jobName string) (bool, error) {
+	var acquired bool
+	err := pdb.conn.QueryRow(`
+		SELECT resource_checking_expires_at > now()
+		FROM jobs
+		WHERE name = $1
+			AND pipeline_id = $2
+		`, jobName, pdb.ID).Scan(&acquired)
+	if err != nil {
+		return false, err
+	}
+	return acquired, nil
 }
 
 func (pdb *pipelineDB) GetResourceVersions(resourceName string, page Page) ([]SavedVersionedResource, Pagination, bool, error) {
@@ -1090,6 +1158,7 @@ func (pdb *pipelineDB) GetJobBuild(job string, name string) (Build, bool, error)
 	return build, found, nil
 }
 
+//TODO: delete this
 func (pdb *pipelineDB) CreateJobBuildForCandidateInputs(jobName string) (Build, bool, error) {
 	tx, err := pdb.conn.Begin()
 	if err != nil {
@@ -1584,7 +1653,7 @@ func (pdb *pipelineDB) GetNextPendingBuildBySerialGroup(jobName string, serialGr
 		INNER JOIN jobs_serial_groups jsg ON j.id = jsg.job_id
 				AND jsg.serial_group IN (`+strings.Join(refs, ",")+`)
 		WHERE b.status = 'pending'
-			AND b.inputs_determined = true
+			AND j.inputs_determined = true
 			AND j.pipeline_id = $1
 		ORDER BY b.id ASC
 		LIMIT 1
@@ -2064,21 +2133,63 @@ func (pdb *pipelineDB) GetCompromiseBuildInputs(jobName string) ([]BuildInput, e
 	return pdb.getBuildInputs("compromise_input_versions", jobName)
 }
 
-func (pdb *pipelineDB) saveInputVersions(table string, inputVersions algorithm.InputMapping, jobName string) error {
-	var jobID int
-	err := pdb.conn.QueryRow(`
-SELECT id FROM jobs WHERE name = $1 AND pipeline_id = $2
-		`, jobName, pdb.ID).Scan(&jobID)
-	if err != nil {
-		return err
-	}
-
+func (pdb *pipelineDB) DeleteCompromiseInputVersions(jobName string) error {
 	tx, err := pdb.conn.Begin()
 	if err != nil {
 		return err
 	}
 
 	defer tx.Rollback()
+
+	var jobID int
+	err = tx.QueryRow(`
+		UPDATE jobs
+		SET inputs_determined = false
+		WHERE name = $1 AND pipeline_id = $2
+		RETURNING id
+		`, jobName, pdb.ID).Scan(&jobID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`
+		DELETE FROM compromise_input_versions WHERE job_id = $1
+		`, jobID)
+	if err != nil {
+		return err
+	}
+
+	tx.Commit()
+	return nil
+}
+
+func (pdb *pipelineDB) saveInputVersions(table string, inputVersions algorithm.InputMapping, jobName string) error {
+	tx, err := pdb.conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	var jobID int
+	switch table {
+	case "ideal_input_versions":
+		err = tx.QueryRow(`
+			SELECT id FROM jobs WHERE name = $1 AND pipeline_id = $2
+			`, jobName, pdb.ID).Scan(&jobID)
+	case "compromise_input_versions":
+		err = tx.QueryRow(`
+			UPDATE jobs
+			SET inputs_determined = true
+			WHERE name = $1 AND pipeline_id = $2
+			RETURNING id
+			`, jobName, pdb.ID).Scan(&jobID)
+	default:
+		panic("unknown table " + table)
+	}
+	if err != nil {
+		return err
+	}
 
 	_, err = tx.Exec(`
 DELETE FROM `+table+` WHERE job_id = $1

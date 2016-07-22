@@ -87,12 +87,31 @@ type FakeJobServiceDB struct {
 		result1 db.MissingInputReasons
 		result2 error
 	}
+	GetBuildPreparationStub        func(int) (db.BuildPreparation, bool, error)
+	getBuildPreparationMutex       sync.RWMutex
+	getBuildPreparationArgsForCall []struct {
+		arg1 int
+	}
+	getBuildPreparationReturns struct {
+		result1 db.BuildPreparation
+		result2 bool
+		result3 error
+	}
 	GetIdealBuildInputsStub        func(jobName string) ([]db.BuildInput, error)
 	getIdealBuildInputsMutex       sync.RWMutex
 	getIdealBuildInputsArgsForCall []struct {
 		jobName string
 	}
 	getIdealBuildInputsReturns struct {
+		result1 []db.BuildInput
+		result2 error
+	}
+	GetCompromiseBuildInputsStub        func(jobName string) ([]db.BuildInput, error)
+	getCompromiseBuildInputsMutex       sync.RWMutex
+	getCompromiseBuildInputsArgsForCall []struct {
+		jobName string
+	}
+	getCompromiseBuildInputsReturns struct {
 		result1 []db.BuildInput
 		result2 error
 	}
@@ -393,6 +412,41 @@ func (fake *FakeJobServiceDB) GetMissingInputReasonsReturns(result1 db.MissingIn
 	}{result1, result2}
 }
 
+func (fake *FakeJobServiceDB) GetBuildPreparation(arg1 int) (db.BuildPreparation, bool, error) {
+	fake.getBuildPreparationMutex.Lock()
+	fake.getBuildPreparationArgsForCall = append(fake.getBuildPreparationArgsForCall, struct {
+		arg1 int
+	}{arg1})
+	fake.recordInvocation("GetBuildPreparation", []interface{}{arg1})
+	fake.getBuildPreparationMutex.Unlock()
+	if fake.GetBuildPreparationStub != nil {
+		return fake.GetBuildPreparationStub(arg1)
+	} else {
+		return fake.getBuildPreparationReturns.result1, fake.getBuildPreparationReturns.result2, fake.getBuildPreparationReturns.result3
+	}
+}
+
+func (fake *FakeJobServiceDB) GetBuildPreparationCallCount() int {
+	fake.getBuildPreparationMutex.RLock()
+	defer fake.getBuildPreparationMutex.RUnlock()
+	return len(fake.getBuildPreparationArgsForCall)
+}
+
+func (fake *FakeJobServiceDB) GetBuildPreparationArgsForCall(i int) int {
+	fake.getBuildPreparationMutex.RLock()
+	defer fake.getBuildPreparationMutex.RUnlock()
+	return fake.getBuildPreparationArgsForCall[i].arg1
+}
+
+func (fake *FakeJobServiceDB) GetBuildPreparationReturns(result1 db.BuildPreparation, result2 bool, result3 error) {
+	fake.GetBuildPreparationStub = nil
+	fake.getBuildPreparationReturns = struct {
+		result1 db.BuildPreparation
+		result2 bool
+		result3 error
+	}{result1, result2, result3}
+}
+
 func (fake *FakeJobServiceDB) GetIdealBuildInputs(jobName string) ([]db.BuildInput, error) {
 	fake.getIdealBuildInputsMutex.Lock()
 	fake.getIdealBuildInputsArgsForCall = append(fake.getIdealBuildInputsArgsForCall, struct {
@@ -422,6 +476,40 @@ func (fake *FakeJobServiceDB) GetIdealBuildInputsArgsForCall(i int) string {
 func (fake *FakeJobServiceDB) GetIdealBuildInputsReturns(result1 []db.BuildInput, result2 error) {
 	fake.GetIdealBuildInputsStub = nil
 	fake.getIdealBuildInputsReturns = struct {
+		result1 []db.BuildInput
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeJobServiceDB) GetCompromiseBuildInputs(jobName string) ([]db.BuildInput, error) {
+	fake.getCompromiseBuildInputsMutex.Lock()
+	fake.getCompromiseBuildInputsArgsForCall = append(fake.getCompromiseBuildInputsArgsForCall, struct {
+		jobName string
+	}{jobName})
+	fake.recordInvocation("GetCompromiseBuildInputs", []interface{}{jobName})
+	fake.getCompromiseBuildInputsMutex.Unlock()
+	if fake.GetCompromiseBuildInputsStub != nil {
+		return fake.GetCompromiseBuildInputsStub(jobName)
+	} else {
+		return fake.getCompromiseBuildInputsReturns.result1, fake.getCompromiseBuildInputsReturns.result2
+	}
+}
+
+func (fake *FakeJobServiceDB) GetCompromiseBuildInputsCallCount() int {
+	fake.getCompromiseBuildInputsMutex.RLock()
+	defer fake.getCompromiseBuildInputsMutex.RUnlock()
+	return len(fake.getCompromiseBuildInputsArgsForCall)
+}
+
+func (fake *FakeJobServiceDB) GetCompromiseBuildInputsArgsForCall(i int) string {
+	fake.getCompromiseBuildInputsMutex.RLock()
+	defer fake.getCompromiseBuildInputsMutex.RUnlock()
+	return fake.getCompromiseBuildInputsArgsForCall[i].jobName
+}
+
+func (fake *FakeJobServiceDB) GetCompromiseBuildInputsReturns(result1 []db.BuildInput, result2 error) {
+	fake.GetCompromiseBuildInputsStub = nil
+	fake.getCompromiseBuildInputsReturns = struct {
 		result1 []db.BuildInput
 		result2 error
 	}{result1, result2}
@@ -485,8 +573,12 @@ func (fake *FakeJobServiceDB) Invocations() map[string][][]interface{} {
 	defer fake.getNextInputVersionsMutex.RUnlock()
 	fake.getMissingInputReasonsMutex.RLock()
 	defer fake.getMissingInputReasonsMutex.RUnlock()
+	fake.getBuildPreparationMutex.RLock()
+	defer fake.getBuildPreparationMutex.RUnlock()
 	fake.getIdealBuildInputsMutex.RLock()
 	defer fake.getIdealBuildInputsMutex.RUnlock()
+	fake.getCompromiseBuildInputsMutex.RLock()
+	defer fake.getCompromiseBuildInputsMutex.RUnlock()
 	fake.useInputsForBuildMutex.RLock()
 	defer fake.useInputsForBuildMutex.RUnlock()
 	return fake.invocations

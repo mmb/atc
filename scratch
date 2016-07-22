@@ -1,0 +1,54 @@
+func (s *Scheduler) Schedule() {
+  var versionsDB
+  for each job:
+    maybeVersionsDB = TryStartAllPendingBuilds(jobName)
+    if maybeVersionsDB != nil {
+      versionsDB = maybeVersionsDB
+    }
+  if versionsDB == nil
+    load versionsDB
+  for each job:
+    if no pending build:
+      compromiseInputs = saveNextIndividualAndCompromiseBuildInputs(versionsDB)
+      if compromiseInputs == nil
+        continue
+
+      if any input config has trigger: true and its compromise build input has not been used
+        TriggerImmediately(jobName)
+}
+
+func TriggerImmediately(jobName) {
+  create a pending build
+  TryStartAllPendingBuilds(jobName)
+}
+
+func TryStartAllPendingBuilds(jobName) VersionsDB {
+  versionsDB = nil
+  if it's not paused and it has a pending build and there aren't too many running builds:
+    run check for all inputs
+    load versionsDB
+
+    compromiseInputs = saveNextIndividualAndCompromiseBuildInputs(versionsDB)
+    if compromiseInputs == nil
+      continue
+
+    if all of the stuff still applies, atomically start it
+    while there is a pending build for this job:
+      if all of the stuff still applies, atomically start it
+      break when the stuff doesn't apply
+
+  return versionsDB
+}
+
+func saveNextIndividualAndCompromiseBuildInputs(versionsDB) CompromiseBuildInputs {
+  save next individual build inputs
+  if not complete:
+    delete compromise build inputs
+    return nil
+  compromiseBuildInputs := save next compromise build inputs
+
+  if not complete:
+    return nil
+
+  return compromiseBuildInputs
+}

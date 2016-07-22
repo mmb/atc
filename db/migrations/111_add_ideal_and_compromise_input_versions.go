@@ -45,5 +45,14 @@ func AddIdealAndCompromiseInputVersions(tx migration.LimitedTx) error {
 		first_occurrence bool NOT NULL
 	)
 	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`
+	ALTER TABLE jobs
+	ADD COLUMN resource_checking_expires_at timestamp NOT NULL DEFAULT 'epoch',
+	ADD COLUMN inputs_determined bool NOT NULL DEFAULT false
+	`)
 	return err
 }

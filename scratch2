@@ -1,0 +1,71 @@
+func (s *Scheduler) Schedule() {
+  load versionsDB
+  for each job:
+    if no pending build:
+      compromiseInputs = saveNextIndividualAndCompromiseBuildInputs(versionsDB)
+      if compromiseInputs == nil
+        continue
+
+      if any input config has trigger: true and its compromise build input has not been used
+        create pending build
+    for TryStartNextPendingBuild(jobName){
+    }
+}
+
+func TriggerImmediately(jobName) {
+  create lease
+  create a pending build
+  run check for all inputs
+  break lease
+
+  load versionsDB
+  compromiseInputs = saveNextIndividualAndCompromiseBuildInputs(versionsDB)
+  if compromiseInputs == nil
+    continue
+  for TryStartNextPendingBuild(jobName){
+  }
+}
+
+func saveNextIndividualAndCompromiseBuildInputs(versionsDB) CompromiseBuildInputs {
+  save next individual build inputs
+  if not complete:
+    delete compromise build inputs
+    return nil
+  compromiseBuildInputs := save next compromise build inputs
+
+  if not complete:
+    return nil
+
+  return compromiseBuildInputs
+}
+
+func TryStartNextPendingBuild(jobName) bool {
+  if it's not paused and it has a pending build and there aren't too many running builds && lease is not acquired:
+    if !s.updateBuildToScheduled(logger, canBuildBeScheduled, build.ID, reason) {
+  		return nil
+  	}
+
+    save build inputs // to prevent it from retriggering if the following lines error
+
+    plan, err := s.Factory.Create(job, resources, resourceTypes, buildInputs)
+    if err != nil {
+      // Don't use ErrorBuild because it logs a build event, and this build hasn't started
+      err := s.BuildsDB.FinishBuild(build.ID, build.PipelineID, db.StatusErrored)
+      if err != nil {
+        logger.Error("failed-to-mark-build-as-errored", err)
+      }
+      return nil
+    }
+
+    createdBuild, err := s.Engine.CreateBuild(logger, build, plan)
+  	if err != nil {
+  		logger.Error("failed-to-create-build", err)
+  		return nil
+  	}
+
+    logger.Info("building-build")
+    go createdBuild.Resume(logger)
+
+    return true
+  return false
+}

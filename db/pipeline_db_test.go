@@ -2892,7 +2892,7 @@ var _ = Describe("PipelineDB", func() {
 			})
 		})
 
-		Describe("GetNextPendingBuildBySerialGroup", func() {
+		FDescribe("GetNextPendingBuildBySerialGroup", func() {
 			var jobOneConfig atc.JobConfig
 			var jobOneTwoConfig atc.JobConfig
 
@@ -2910,11 +2910,13 @@ var _ = Describe("PipelineDB", func() {
 
 					actualBuild, err = pipelineDB.CreateJobBuild(jobOneTwoConfig.Name)
 					Expect(err).NotTo(HaveOccurred())
-					_, err = dbConn.Exec(`
-						UPDATE builds
-						SET inputs_determined = true
-						WHERE id = $1
-					`, actualBuild.ID)
+					err = pipelineDB.SaveCompromiseInputVersions(nil, "other-serial-group-job")
+					Expect(err).NotTo(HaveOccurred())
+
+					// test DeleteCompromiseInputVersions
+					err = pipelineDB.SaveCompromiseInputVersions(nil, "some-job")
+					Expect(err).NotTo(HaveOccurred())
+					err = pipelineDB.DeleteCompromiseInputVersions("some-job")
 					Expect(err).NotTo(HaveOccurred())
 				})
 
@@ -2936,12 +2938,9 @@ var _ = Describe("PipelineDB", func() {
 				buildThree, err := pipelineDB.CreateJobBuild(jobOneTwoConfig.Name)
 				Expect(err).NotTo(HaveOccurred())
 
-				_, err = dbConn.Exec(`
-					UPDATE builds
-					SET inputs_determined = true
-					WHERE id in ($1, $2, $3)
-				`, buildOne.ID, buildTwo.ID, buildThree.ID)
-
+				err = pipelineDB.SaveCompromiseInputVersions(nil, "some-job")
+				Expect(err).NotTo(HaveOccurred())
+				err = pipelineDB.SaveCompromiseInputVersions(nil, "other-serial-group-job")
 				Expect(err).NotTo(HaveOccurred())
 
 				build, found, err := pipelineDB.GetNextPendingBuildBySerialGroup(jobOneConfig.Name, []string{"serial-group"})

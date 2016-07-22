@@ -27,6 +27,7 @@ type JobServiceDB interface {
 		inputs []config.JobInput,
 		idealMapping algorithm.InputMapping,
 	) (db.MissingInputReasons, error)
+	GetBuildPreparation(int) (db.BuildPreparation, bool, error)
 	GetIdealBuildInputs(jobName string) ([]db.BuildInput, error)
 	GetCompromiseBuildInputs(jobName string) ([]db.BuildInput, error)
 	UseInputsForBuild(buildID int, inputs []db.BuildInput) error
@@ -173,43 +174,6 @@ func (s jobService) CanBuildBeScheduled(
 	versions *algorithm.VersionsDB,
 	buildInputs []db.BuildInput,
 ) (bool, string, error) {
-	if build.Scheduled {
-		return s.updateBuildPrepAndReturn(buildPrep, true, "build-scheduled")
-	}
-
-	buildPrep = db.NewBuildPreparation(buildPrep.BuildID)
-	err := s.DB.UpdateBuildPreparation(buildPrep)
-	if err != nil {
-		return false, "update-build-prep-db-failed-reset-build-prep", err
-	}
-
-	paused, err := s.DB.IsPaused()
-	if err != nil {
-		return false, "pause-pipeline-db-failed", err
-	}
-
-	if paused {
-		buildPrep.PausedPipeline = db.BuildPreparationStatusBlocking
-		return s.updateBuildPrepAndReturn(buildPrep, false, "pipeline-paused")
-	}
-
-	buildPrep.PausedPipeline = db.BuildPreparationStatusNotBlocking
-	err = s.DB.UpdateBuildPreparation(buildPrep)
-	if err != nil {
-		return false, "update-build-prep-db-failed-pipeline-not-paused", err
-	}
-
-	if s.DBJob.Paused {
-		buildPrep.PausedJob = db.BuildPreparationStatusBlocking
-		return s.updateBuildPrepAndReturn(buildPrep, false, "job-paused")
-	}
-
-	buildPrep.PausedJob = db.BuildPreparationStatusNotBlocking
-	err = s.DB.UpdateBuildPreparation(buildPrep)
-	if err != nil {
-		return false, "update-build-prep-db-failed-job-not-paused", err
-	}
-
 	if build.Status != db.StatusPending {
 		return false, "build-not-pending", nil
 	}

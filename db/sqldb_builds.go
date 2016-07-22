@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/concourse/atc"
+	"github.com/concourse/atc/config"
 	"github.com/concourse/atc/event"
 	"github.com/lib/pq"
 )
@@ -393,7 +394,132 @@ func (db *SQLDB) CreateOneOffBuild() (Build, error) {
 }
 
 func (db *SQLDB) GetBuildPreparation(passedBuildID int) (BuildPreparation, bool, error) {
-	return db.buildPrepHelper.GetBuildPreparation(db.conn, passedBuildID)
+	var jobID int
+	err := db.conn.QueryRow(`
+SELECT job_id
+FROM builds
+WHERE id = $1
+		`, passedBuildID).Scan(&jobID)
+	if err != nil {
+		return BuildPreparation{}, false, err
+	}
+	if jobID == 0 {
+		return BuildPreparation{}, true, nil
+	}
+
+	var (
+		pausedPipeline       bool
+		pausedJob            bool
+		tooManyBuildsRunning bool
+		pipelineID           int
+		jobName              string
+	)
+	err = db.conn.QueryRow(fmt.Sprintf(`
+			SELECT p.paused, j.paused, bp.max_running_builds, j.pipeline_id, j.name
+			FROM builds b
+			JOIN jobs j
+				ON b.job_id = j.id
+			JOIN pipelines p
+				ON j.pipeline_id = p.id
+			JOIN build_preparation bp
+				ON bp.build_id = b.id
+			WHERE b.id = $1
+		`, passedBuildID)).Scan(&pausedPipeline, &pausedJob, &tooManyBuildsRunning, &pipelineID, &jobName)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return BuildPreparation{}, false, nil
+		}
+		return BuildPreparation{}, false, err
+	}
+
+	pdbf := NewPipelineDBFactory(db.conn, db.bus, db)
+	pdb, err := pdbf.BuildWithID(pipelineID)
+	if err != nil {
+		return BuildPreparation{}, false, err
+	}
+
+	pipelineConfig, _, found, err := pdb.GetConfig()
+	if err != nil {
+		return BuildPreparation{}, false, err
+	}
+
+	if !found {
+		return BuildPreparation{}, false, nil
+	}
+
+	jobConfig, found := pipelineConfig.Jobs.Lookup(jobName)
+	if !found {
+		return BuildPreparation{}, false, nil
+	}
+
+	configInputs := config.JobInputs(jobConfig)
+
+	buildInputs, err := pdb.GetIdealBuildInputs(jobName)
+	if err != nil {
+		return BuildPreparation{}, false, err
+	}
+
+	inputsSatisfied := BuildPreparationStatusBlocking
+	if len(buildInputs) == len(configInputs) {
+		compromiseBuildInputs, err := pdb.GetCompromiseBuildInputs(jobName)
+		if err != nil {
+			return BuildPreparation{}, false, err
+		}
+
+		if len(compromiseBuildInputs) == len(configInputs) {
+			buildInputs = compromiseBuildInputs
+			inputsSatisfied = BuildPreparationStatusNotBlocking
+		}
+	}
+
+	inputs := map[string]BuildPreparationStatus{}
+	missingInputReasons := MissingInputReasons{}
+	for _, configInput := range configInputs {
+		found := false
+		for _, buildInput := range buildInputs {
+			if buildInput.Name == configInput.Name {
+				found = true
+				break
+			}
+		}
+		if found {
+			inputs[configInput.Name] = BuildPreparationStatusNotBlocking
+		} else {
+			inputs[configInput.Name] = BuildPreparationStatusBlocking
+			if len(configInput.Passed) > 0 {
+				missingInputReasons.RegisterPassedConstraint(configInput.Name)
+			} else {
+				missingInputReasons.RegisterNoVersions(configInput.Name)
+			}
+		}
+	}
+
+	pausedPipelineStatus := BuildPreparationStatusNotBlocking
+	if pausedPipeline {
+		pausedPipelineStatus = BuildPreparationStatusBlocking
+	}
+
+	pausedJobStatus := BuildPreparationStatusNotBlocking
+	if pausedJob {
+		pausedJobStatus = BuildPreparationStatusBlocking
+	}
+
+	tooManyBuildsRunningStatus := BuildPreparationStatusNotBlocking
+	if tooManyBuildsRunning {
+		tooManyBuildsRunningStatus = BuildPreparationStatusBlocking
+	}
+
+	buildPreparation := BuildPreparation{
+		BuildID:             passedBuildID,
+		PausedPipeline:      pausedPipelineStatus,
+		PausedJob:           pausedJobStatus,
+		MaxRunningBuilds:    tooManyBuildsRunningStatus,
+		Inputs:              inputs,
+		InputsSatisfied:     inputsSatisfied,
+		MissingInputReasons: missingInputReasons,
+	}
+
+	return buildPreparation, true, nil
 }
 
 func (db *SQLDB) UpdateBuildPreparation(buildPrep BuildPreparation) error {
