@@ -61,7 +61,7 @@ type PipelineDB interface {
 	GetAllJobBuilds(job string) ([]Build, error)
 
 	GetJobBuild(job string, build string) (Build, bool, error)
-	CreateJobBuild(job string) (Build, error)
+	CreateJobBuild(job string, requireResourceChecking bool) (Build, error)
 	CreateJobBuildForCandidateInputs(job string) (Build, bool, error)
 
 	LeaseResourceCheckingForJob(logger lager.Logger, job string, interval time.Duration) (Lease, bool, error)
@@ -478,9 +478,24 @@ func (pdb *pipelineDB) LeaseResourceCheckingForJob(logger lager.Logger, job stri
 			"job_name": job,
 		}),
 		attemptSignFunc: func(tx Tx) (sql.Result, error) {
+			result, err := tx.Exec(`
+				UPDATE builds b
+				SET requires_resources_checked_after = 'epoch'
+				FROM jobs j
+				WHERE j.name = $1
+					AND j.pipeline_id = $2
+					AND b.job_id = j.id
+					AND resource_checking_expires_at <= now()
+					AND b.requires_resources_checked_after < j.resource_checking_start
+				`, job, pdb.ID)
+			if err != nil {
+				return result, err
+			}
+
 			return tx.Exec(`
 					UPDATE jobs
-					SET resource_checking_expires_at = now() + ($3 || ' SECONDS')::INTERVAL
+					SET resource_checking_expires_at = now() + ($3 || ' SECONDS')::INTERVAL,
+						resource_checking_start = now()
 					WHERE name = $1
 						AND pipeline_id = $2
 						AND resource_checking_expires_at <= now()
@@ -1180,7 +1195,7 @@ func (pdb *pipelineDB) CreateJobBuildForCandidateInputs(jobName string) (Build, 
 	`, jobName, pdb.ID).Scan(&x)
 
 	if err == sql.ErrNoRows {
-		build, err := pdb.createJobBuild(jobName, tx)
+		build, err := pdb.createJobBuild(jobName, false, tx)
 		if err != nil {
 			return Build{}, false, err
 		}
@@ -1247,7 +1262,7 @@ func (pdb *pipelineDB) UseInputsForBuild(buildID int, inputs []BuildInput) error
 	return tx.Commit()
 }
 
-func (pdb *pipelineDB) CreateJobBuild(jobName string) (Build, error) {
+func (pdb *pipelineDB) CreateJobBuild(jobName string, requireResourceChecking bool) (Build, error) {
 	tx, err := pdb.conn.Begin()
 	if err != nil {
 		return Build{}, err
@@ -1255,7 +1270,7 @@ func (pdb *pipelineDB) CreateJobBuild(jobName string) (Build, error) {
 
 	defer tx.Rollback()
 
-	build, err := pdb.createJobBuild(jobName, tx)
+	build, err := pdb.createJobBuild(jobName, requireResourceChecking, tx)
 	if err != nil {
 		return Build{}, err
 	}
@@ -1268,7 +1283,7 @@ func (pdb *pipelineDB) CreateJobBuild(jobName string) (Build, error) {
 	return build, nil
 }
 
-func (pdb *pipelineDB) createJobBuild(jobName string, tx Tx) (Build, error) {
+func (pdb *pipelineDB) createJobBuild(jobName string, requireResourceChecking bool, tx Tx) (Build, error) {
 	dbJob, err := pdb.getJob(tx, jobName)
 	if err != nil {
 		return Build{}, err
@@ -1288,10 +1303,14 @@ func (pdb *pipelineDB) createJobBuild(jobName string, tx Tx) (Build, error) {
 
 	// We had to resort to sub-selects here because you can't paramaterize a
 	// RETURNING statement in lib/pq... sorry
+	timeQuery := "'epoch'"
+	if requireResourceChecking {
+		timeQuery = "now()"
+	}
 
 	build, _, err := scanBuild(tx.QueryRow(`
-		INSERT INTO builds (name, job_id, status)
-		VALUES ($1, $2, 'pending')
+		INSERT INTO builds (name, job_id, status, requires_resources_checked_after)
+		VALUES ($1, $2, 'pending', `+timeQuery+`)
 		RETURNING `+buildColumns+`,
 			(
 				SELECT j.name
@@ -1595,6 +1614,10 @@ func (pdb *pipelineDB) GetNextPendingBuild(job string) (Build, bool, error) {
 		INNER JOIN pipelines p ON j.pipeline_id = p.id
 		WHERE b.job_id = $1
 		AND b.status = 'pending'
+		AND (
+			(b.requires_resources_checked_after <= j.resource_checking_start AND j.resource_checking_expires_at <= now())
+			OR j.resource_checking_expires_at <= 'epoch'
+		)
 		ORDER BY b.id ASC
 		LIMIT 1
 	`, dbJob.ID))

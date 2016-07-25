@@ -34,24 +34,20 @@ type BuildInput struct {
 }
 
 func (db VersionsDB) IsVersionFirstOccurrence(versionID int, jobID int, inputName string) bool {
-	if len(db.BuildInputs) == 0 {
-		return true
-	}
-
 	for _, buildInput := range db.BuildInputs {
 		fmt.Printf("[mylog]: is version first occurrence. buildInput: {versionID: %d, jobID: %d, inputName: %s}, versionID: %d, jobID: %d, inputName: %s",
 			buildInput.VersionID, buildInput.JobID, buildInput.InputName,
 			versionID, jobID, inputName,
 		)
-		if buildInput.VersionID != versionID &&
+		if buildInput.VersionID == versionID &&
 			buildInput.JobID == jobID &&
 			buildInput.InputName == inputName {
-			fmt.Println("[mylog] is first occurrence")
-			return true
+			fmt.Println("[mylog] is not first occurrence")
+			return false
 		}
 	}
-	fmt.Println("[mylog] not first occurrence")
-	return false
+	fmt.Println("[mylog] first occurrence")
+	return true
 }
 
 func (db VersionsDB) AllVersionsForResource(resourceID int) VersionCandidates {

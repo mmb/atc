@@ -173,7 +173,7 @@ var _ = Describe("Resource History", func() {
 
 				expectedVersions[9].Metadata = metadata
 
-				build, err := pipelineDB.CreateJobBuild("some-job")
+				build, err := pipelineDB.CreateJobBuild("some-job", false)
 				Expect(err).ToNot(HaveOccurred())
 
 				pipelineDB.SaveBuildInput(build.ID, db.BuildInput{
@@ -216,15 +216,15 @@ var _ = Describe("Resource History", func() {
 		var expectedBuilds []db.Build
 
 		BeforeEach(func() {
-			build, err := pipelineDB.CreateJobBuild("some-job")
+			build, err := pipelineDB.CreateJobBuild("some-job", false)
 			Expect(err).NotTo(HaveOccurred())
 			expectedBuilds = append(expectedBuilds, build)
 
-			secondBuild, err := pipelineDB.CreateJobBuild("some-job")
+			secondBuild, err := pipelineDB.CreateJobBuild("some-job", false)
 			Expect(err).NotTo(HaveOccurred())
 			expectedBuilds = append(expectedBuilds, secondBuild)
 
-			_, err = pipelineDB.CreateJobBuild("some-other-job")
+			_, err = pipelineDB.CreateJobBuild("some-other-job", false)
 			Expect(err).NotTo(HaveOccurred())
 
 			savedVersionedResource, err = pipelineDB.SaveBuildInput(build.ID, db.BuildInput{
@@ -287,15 +287,15 @@ var _ = Describe("Resource History", func() {
 		var expectedBuilds []db.Build
 
 		BeforeEach(func() {
-			build, err := pipelineDB.CreateJobBuild("some-job")
+			build, err := pipelineDB.CreateJobBuild("some-job", false)
 			Expect(err).NotTo(HaveOccurred())
 			expectedBuilds = append(expectedBuilds, build)
 
-			secondBuild, err := pipelineDB.CreateJobBuild("some-job")
+			secondBuild, err := pipelineDB.CreateJobBuild("some-job", false)
 			Expect(err).NotTo(HaveOccurred())
 			expectedBuilds = append(expectedBuilds, secondBuild)
 
-			_, err = pipelineDB.CreateJobBuild("some-other-job")
+			_, err = pipelineDB.CreateJobBuild("some-other-job", false)
 			Expect(err).NotTo(HaveOccurred())
 
 			savedVersionedResource, err = pipelineDB.SaveBuildOutput(build.ID, db.VersionedResource{

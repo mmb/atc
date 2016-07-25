@@ -71,7 +71,7 @@ var _ = Describe("Input Versions", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// save metadata for v1
-		build, err := pipelineDB.CreateJobBuild("some-job")
+		build, err := pipelineDB.CreateJobBuild("some-job", false)
 		Expect(err).ToNot(HaveOccurred())
 		_, err = pipelineDB.SaveBuildInput(build.ID, db.BuildInput{
 			Name: "some-input",

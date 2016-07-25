@@ -307,10 +307,11 @@ type FakePipelineDB struct {
 		result2 bool
 		result3 error
 	}
-	CreateJobBuildStub        func(job string) (db.Build, error)
+	CreateJobBuildStub        func(job string, requrequireResourceCheckingceChecking bool) (db.Build, error)
 	createJobBuildMutex       sync.RWMutex
 	createJobBuildArgsForCall []struct {
-		job string
+		job                                   string
+		requrequireResourceCheckingceChecking bool
 	}
 	createJobBuildReturns struct {
 		result1 db.Build
@@ -1648,15 +1649,16 @@ func (fake *FakePipelineDB) GetJobBuildReturns(result1 db.Build, result2 bool, r
 	}{result1, result2, result3}
 }
 
-func (fake *FakePipelineDB) CreateJobBuild(job string) (db.Build, error) {
+func (fake *FakePipelineDB) CreateJobBuild(job string, requrequireResourceCheckingceChecking bool) (db.Build, error) {
 	fake.createJobBuildMutex.Lock()
 	fake.createJobBuildArgsForCall = append(fake.createJobBuildArgsForCall, struct {
-		job string
-	}{job})
-	fake.recordInvocation("CreateJobBuild", []interface{}{job})
+		job                                   string
+		requrequireResourceCheckingceChecking bool
+	}{job, requrequireResourceCheckingceChecking})
+	fake.recordInvocation("CreateJobBuild", []interface{}{job, requrequireResourceCheckingceChecking})
 	fake.createJobBuildMutex.Unlock()
 	if fake.CreateJobBuildStub != nil {
-		return fake.CreateJobBuildStub(job)
+		return fake.CreateJobBuildStub(job, requrequireResourceCheckingceChecking)
 	} else {
 		return fake.createJobBuildReturns.result1, fake.createJobBuildReturns.result2
 	}
@@ -1668,10 +1670,10 @@ func (fake *FakePipelineDB) CreateJobBuildCallCount() int {
 	return len(fake.createJobBuildArgsForCall)
 }
 
-func (fake *FakePipelineDB) CreateJobBuildArgsForCall(i int) string {
+func (fake *FakePipelineDB) CreateJobBuildArgsForCall(i int) (string, bool) {
 	fake.createJobBuildMutex.RLock()
 	defer fake.createJobBuildMutex.RUnlock()
-	return fake.createJobBuildArgsForCall[i].job
+	return fake.createJobBuildArgsForCall[i].job, fake.createJobBuildArgsForCall[i].requrequireResourceCheckingceChecking
 }
 
 func (fake *FakePipelineDB) CreateJobBuildReturns(result1 db.Build, result2 error) {

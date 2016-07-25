@@ -414,7 +414,7 @@ WHERE id = $1
 		pipelineID           int
 		jobName              string
 	)
-	err = db.conn.QueryRow(fmt.Sprintf(`
+	err = db.conn.QueryRow(`
 			SELECT p.paused, j.paused, bp.max_running_builds, j.pipeline_id, j.name
 			FROM builds b
 			JOIN jobs j
@@ -424,7 +424,7 @@ WHERE id = $1
 			JOIN build_preparation bp
 				ON bp.build_id = b.id
 			WHERE b.id = $1
-		`, passedBuildID)).Scan(&pausedPipeline, &pausedJob, &tooManyBuildsRunning, &pipelineID, &jobName)
+		`, passedBuildID).Scan(&pausedPipeline, &pausedJob, &tooManyBuildsRunning, &pipelineID, &jobName)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return BuildPreparation{}, false, nil

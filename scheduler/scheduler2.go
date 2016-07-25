@@ -1,6 +1,8 @@
 package scheduler
 
 import (
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/concourse/atc"
@@ -8,19 +10,22 @@ import (
 	"github.com/concourse/atc/db"
 	"github.com/concourse/atc/db/algorithm"
 	"github.com/concourse/atc/engine"
+	"github.com/concourse/atc/metric"
 	"github.com/pivotal-golang/lager"
 )
 
-type Scheduler2 struct {
-	DB       Scheduler2DB
-	BuildsDB BuildsDB2
+type Scheduler struct {
+	DB       SchedulerDB
+	BuildsDB SchedulerBuildsDB
 	Factory  BuildFactory
 	Engine   engine.Engine
-	Scanner  Scanner2
+	Scanner  Scanner
 }
 
-type Scheduler2DB interface {
-	CreateJobBuild(jobName string) (db.Build, error)
+//go:generate counterfeiter . SchedulerDB
+
+type SchedulerDB interface {
+	CreateJobBuild(jobName string, requireResourceChecking bool) (db.Build, error)
 	GetNextPendingBuild(job string) (db.Build, bool, error)
 	IsPaused() (bool, error)
 	GetConfig() (atc.Config, db.ConfigVersion, bool, error)
@@ -37,55 +42,144 @@ type Scheduler2DB interface {
 	SaveCompromiseInputVersions(inputVersions algorithm.InputMapping, jobName string) error
 	DeleteCompromiseInputVersions(jobName string) error
 	LoadVersionsDB() (*algorithm.VersionsDB, error)
+	LeaseScheduling(lager.Logger, time.Duration) (db.Lease, bool, error)
+	GetPipelineName() string
 }
 
-type BuildsDB2 interface {
+//go:generate counterfeiter . SchedulerBuildsDB
+
+type SchedulerBuildsDB interface {
 	FinishBuild(buildID int, pipelineID int, status db.Status) error
 }
 
-type Scanner2 interface {
+//go:generate counterfeiter . Scanner
+
+type Scanner interface {
 	Scan(lager.Logger, string) error
 }
 
-func (s *Scheduler2) isMaxInFlightReached(logger lager.Logger, jobConfig atc.JobConfig, buildID int) (bool, error) {
-	logger = logger.Session("is-max-in-flight-reached")
-	maxInFlight := jobConfig.MaxInFlight()
+//go:generate counterfeiter . BuildFactory
 
-	if maxInFlight > 0 {
-		builds, err := s.DB.GetRunningBuildsBySerialGroup(jobConfig.Name, jobConfig.GetSerialGroups())
-		if err != nil {
-			logger.Error("failed-to-get-running-builds-by-serial-group", err)
-			return false, err
-		}
-
-		if len(builds) >= maxInFlight {
-			return true, nil
-		}
-
-		nextMostPendingBuild, found, err := s.DB.GetNextPendingBuildBySerialGroup(jobConfig.Name, jobConfig.GetSerialGroups())
-		if err != nil {
-			logger.Error("failed-to-get-next-pending-build-by-serial-group", err)
-			return false, err
-		}
-
-		if !found {
-			logger.Debug("pending-build-disappeared-from-serial-group") // TODO: existing bug?
-			return true, nil
-		}
-
-		return nextMostPendingBuild.ID != buildID, nil
-	}
-
-	return false, nil
+type BuildFactory interface {
+	Create(atc.JobConfig, atc.ResourceConfigs, atc.ResourceTypes, []db.BuildInput) (atc.Plan, error)
 }
 
-// !pipeline paused
-// !job paused
-// get next pending build
+func (s *Scheduler) Schedule(logger lager.Logger, interval time.Duration) error {
+	logger = logger.Session("schedule")
 
-func (s *Scheduler2) TryStartNextPendingBuild(logger lager.Logger, jobName string) (bool, error) {
+	schedulingLease, leased, err := s.DB.LeaseScheduling(logger, interval)
+	if err != nil {
+		logger.Error("failed-to-acquire-scheduling-lease", err)
+		return nil
+	}
+
+	if !leased {
+		return nil
+	}
+
+	defer schedulingLease.Break()
+
+	pipelineConfig, _, found, err := s.DB.GetConfig()
+	if err != nil {
+		logger.Error("failed-to-get-pipeline-config", err)
+		return err
+	}
+
+	if !found {
+		logger.Debug("pipeline-config-disappeared")
+		return nil
+	}
+
+	start := time.Now()
+
+	defer func() {
+		metric.SchedulingFullDuration{
+			PipelineName: s.DB.GetPipelineName(),
+			Duration:     time.Since(start),
+		}.Emit(logger)
+	}()
+
+	versions, err := s.DB.LoadVersionsDB()
+	if err != nil {
+		logger.Error("failed-to-load-versions-db", err)
+		return err
+	}
+
+	metric.SchedulingLoadVersionsDuration{
+		PipelineName: s.DB.GetPipelineName(),
+		Duration:     time.Since(start),
+	}.Emit(logger)
+
+	for _, job := range pipelineConfig.Jobs {
+		sLog := logger.Session("scheduling", lager.Data{
+			"job": job.Name,
+		})
+
+		jStart := time.Now()
+
+		compromiseInputMapping, complete, err := s.saveNextIndividualAndCompromiseBuildInputs(logger, versions, job)
+		if err != nil {
+			return err
+		}
+
+		if complete {
+			_, found, err := s.DB.GetNextPendingBuild(job.Name)
+			if err != nil {
+				logger.Error("failed-to-get-next-pending-build", err)
+				return err
+			}
+
+			if !found {
+				inputConfigs := config.JobInputs(job)
+				trigger := false
+				for _, inputConfig := range inputConfigs {
+					//trigger: true, and the version has not been used
+					if inputConfig.Trigger && compromiseInputMapping[inputConfig.Name].FirstOccurrence {
+						trigger = true
+						break
+					}
+				}
+
+				if trigger {
+					_, err := s.DB.CreateJobBuild(job.Name, false)
+					if err != nil {
+						logger.Error("failed-to-create-job-build", err)
+						return err
+					}
+				}
+			}
+		}
+
+		for true {
+			started, err := s.tryStartNextPendingBuild(logger, job, pipelineConfig.Resources, pipelineConfig.ResourceTypes, false)
+			if err != nil {
+				return err
+			}
+			if !started {
+				logger.Info("finished-try-starting-pending-builds")
+				break
+			}
+		}
+
+		metric.SchedulingJobDuration{
+			PipelineName: s.DB.GetPipelineName(),
+			JobName:      job.Name,
+			Duration:     time.Since(jStart),
+		}.Emit(sLog)
+	}
+
+	return nil
+}
+
+func (s *Scheduler) tryStartNextPendingBuild(
+	logger lager.Logger,
+	jobConfig atc.JobConfig,
+	resourceConfigs atc.ResourceConfigs,
+	resourceTypes atc.ResourceTypes,
+	immediate bool,
+) (bool, error) {
 	logger = logger.Session("try-start-next-pending-build")
-	nextPendingBuild, found, err := s.DB.GetNextPendingBuild(jobName)
+	nextPendingBuild, found, err := s.DB.GetNextPendingBuild(jobConfig.Name)
 	if err != nil {
 		logger.Error("failed-to-get-next-pending-build", err)
 		return false, err
@@ -103,28 +197,12 @@ func (s *Scheduler2) TryStartNextPendingBuild(logger lager.Logger, jobName strin
 		return false, nil
 	}
 
-	job, err := s.DB.GetJob(jobName)
+	job, err := s.DB.GetJob(jobConfig.Name)
 	if err != nil {
 		logger.Error("failed-to-check-if-job-is-paused", err)
 		return false, err
 	}
 	if job.Paused {
-		return false, nil
-	}
-
-	pipelineConfig, _, found, err := s.DB.GetConfig()
-	if err != nil {
-		logger.Error("failed-to-get-pipeline-config", err)
-		return false, err
-	}
-	if !found {
-		logger.Info("pipeline-config-disappeared")
-		return false, nil
-	}
-
-	jobConfig, found := pipelineConfig.Jobs.Lookup(jobName)
-	if !found {
-		logger.Info("job-config-disappeared")
 		return false, nil
 	}
 
@@ -136,7 +214,7 @@ func (s *Scheduler2) TryStartNextPendingBuild(logger lager.Logger, jobName strin
 		return false, nil
 	}
 
-	acquired, err := s.DB.LeaseResourceCheckingForJobAcquired(jobName)
+	acquired, err := s.DB.LeaseResourceCheckingForJobAcquired(jobConfig.Name)
 	if err != nil {
 		logger.Error("failed-to-check-if-resource-checking-lease-for-job-is-acquired", err)
 		return false, err
@@ -157,7 +235,7 @@ func (s *Scheduler2) TryStartNextPendingBuild(logger lager.Logger, jobName strin
 		return false, nil
 	}
 
-	buildInputs, err := s.DB.GetCompromiseBuildInputs(jobName)
+	buildInputs, err := s.DB.GetCompromiseBuildInputs(jobConfig.Name)
 	if err != nil {
 		logger.Error("failed-to-get-compromise-build-inputs", err)
 		return false, nil
@@ -168,7 +246,7 @@ func (s *Scheduler2) TryStartNextPendingBuild(logger lager.Logger, jobName strin
 		return false, nil
 	}
 
-	plan, err := s.Factory.Create(jobConfig, pipelineConfig.Resources, pipelineConfig.ResourceTypes, buildInputs)
+	plan, err := s.Factory.Create(jobConfig, resourceConfigs, resourceTypes, buildInputs)
 	if err != nil {
 		// Don't use ErrorBuild because it logs a build event, and this build hasn't started
 		err := s.BuildsDB.FinishBuild(nextPendingBuild.ID, nextPendingBuild.PipelineID, db.StatusErrored)
@@ -190,83 +268,101 @@ func (s *Scheduler2) TryStartNextPendingBuild(logger lager.Logger, jobName strin
 	return true, nil
 }
 
-func (s *Scheduler2) TriggerImmediately(logger lager.Logger, jobConfig atc.JobConfig) error {
+func (s *Scheduler) TriggerImmediately(
+	logger lager.Logger,
+	jobConfig atc.JobConfig,
+	resourceConfigs atc.ResourceConfigs,
+	resourceTypes atc.ResourceTypes,
+) (db.Build, error) {
 	logger = logger.Session("trigger-immediately", lager.Data{"job_name": jobConfig.Name})
-	lease, created, err := s.DB.LeaseResourceCheckingForJob(logger, jobConfig.Name, 5*time.Minute)
-	if err != nil {
-		logger.Error("failed-to-lease-resource-checking-job", err)
-		return err
-	}
 
-	if !created {
-		logger.Debug("failed-to-resource-checking-lease-for-job")
-		return nil
-	}
-
-	_, err = s.DB.CreateJobBuild(jobConfig.Name)
+	build, err := s.DB.CreateJobBuild(jobConfig.Name, true) // require resource checking
 	if err != nil {
 		logger.Error("failed-to-create-job-build", err)
-		return err
+		return db.Build{}, err
 	}
 
-	jobBuildInputs := config.JobInputs(jobConfig)
-	for _, input := range jobBuildInputs {
-		scanLog := logger.Session("scan", lager.Data{
-			"input":    input.Name,
-			"resource": input.Resource,
-		})
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 
-		err := s.Scanner.Scan(scanLog, input.Resource)
+		lease, created, err := s.DB.LeaseResourceCheckingForJob(logger, jobConfig.Name, 5*time.Minute)
 		if err != nil {
-			logger.Error("failed-to-scan-resource", err, lager.Data{"resource": input.Resource})
-			return err
+			logger.Error("failed-to-lease-resource-checking-job", err)
+			return
 		}
-	}
 
-	lease.Break()
-	versions, err := s.DB.LoadVersionsDB()
-	if err != nil {
-		logger.Error("failed-to-load-versions-db", err)
-		return err
-	}
+		if !created {
+			return
+		}
 
-	complete, err := s.saveNextIndividualAndCompromiseBuildInputs(logger, versions, jobConfig)
-	if err != nil {
-		return err
-	}
+		jobBuildInputs := config.JobInputs(jobConfig)
+		for _, input := range jobBuildInputs {
+			scanLog := logger.Session("scan", lager.Data{
+				"input":    input.Name,
+				"resource": input.Resource,
+			})
 
-	if !complete {
-		logger.Info("not-enough-compromise-inputs")
-		return nil
-	}
+			err := s.Scanner.Scan(scanLog, input.Resource)
+			if err != nil {
+				logger.Error("failed-to-scan-resource", err, lager.Data{"resource": input.Resource})
+				lease.Break()
+				return
+			}
+		}
 
-	for true {
-		started, err := s.TryStartNextPendingBuild(logger, jobConfig.Name)
+		versions, err := s.DB.LoadVersionsDB()
 		if err != nil {
-			return err
+			logger.Error("failed-to-load-versions-db", err)
+			lease.Break()
+			return
 		}
-		if !started {
-			logger.Info("finished-try-starting-pending-builds")
-			break
-		}
-	}
 
-	return nil
+		_, complete, err := s.saveNextIndividualAndCompromiseBuildInputs(logger, versions, jobConfig)
+		if err != nil {
+			lease.Break()
+			return
+		}
+
+		if !complete {
+			logger.Info("not-enough-compromise-inputs")
+			lease.Break()
+			return
+		}
+
+		lease.Break()
+
+		for true {
+			started, err := s.tryStartNextPendingBuild(logger, jobConfig, resourceConfigs, resourceTypes, true)
+			if err != nil {
+				return
+			}
+			if !started {
+				logger.Info("finished-try-starting-pending-builds")
+				break
+			}
+		}
+	}()
+
+	return build, nil
 }
 
-func (s *Scheduler2) saveNextIndividualAndCompromiseBuildInputs(
+func (s *Scheduler) saveNextIndividualAndCompromiseBuildInputs(
 	logger lager.Logger,
 	versions *algorithm.VersionsDB,
 	job atc.JobConfig,
-) (bool, error) {
+) (algorithm.InputMapping, bool, error) {
 	logger = logger.Session("save-next-ideal-and-compromise-build-inputs")
 
 	inputConfigs := config.JobInputs(job)
 
 	algorithmInputConfigs, err := s.DB.GetAlgorithmInputConfigs(versions, job.Name, inputConfigs)
+	logger.Debug(fmt.Sprintf("[mylog] algo input configs: %#v", algorithmInputConfigs))
+
 	if err != nil {
 		logger.Error("failed-to-get-algorithm-input-configs", err)
-		return false, err
+		return nil, false, err
 	}
 
 	idealMapping := algorithm.InputMapping{}
@@ -277,33 +373,67 @@ func (s *Scheduler2) saveNextIndividualAndCompromiseBuildInputs(
 		}
 	}
 
+	logger.Debug(fmt.Sprintf("[mylog] ideal input versions: %#v", idealMapping))
 	err = s.DB.SaveIdealInputVersions(idealMapping, job.Name)
 	if err != nil {
 		logger.Error("failed-to-save-ideal-input-versions", err)
-		return false, err
+		return nil, false, err
 	}
 
 	//if there is not an ideal version for every input
 	if len(idealMapping) < len(inputConfigs) { // important to not compare it to len(algorithmInputConfigs)
-		return false, nil
+		return nil, false, nil
 	}
 
 	compromiseMapping, ok := algorithmInputConfigs.Resolve(versions)
+	logger.Debug(fmt.Sprintf("[mylog] compromise input versions: %#v", compromiseMapping))
 	if !ok {
 		err := s.DB.DeleteCompromiseInputVersions(job.Name)
 		if err != nil {
 			logger.Error("failed-to-delete-compromise-input-versions", err)
-			return false, err
+			return nil, false, err
 		}
 
-		return false, nil
+		return nil, false, nil
 	}
 
 	err = s.DB.SaveCompromiseInputVersions(compromiseMapping, job.Name)
 	if err != nil {
 		logger.Error("failed-to-save-compromise-input-versions", err)
-		return false, err
+		return nil, false, err
 	}
 
-	return true, nil
+	return compromiseMapping, true, nil
+}
+
+func (s *Scheduler) isMaxInFlightReached(logger lager.Logger, jobConfig atc.JobConfig, buildID int) (bool, error) {
+	logger = logger.Session("is-max-in-flight-reached")
+	maxInFlight := jobConfig.MaxInFlight()
+
+	if maxInFlight > 0 {
+		builds, err := s.DB.GetRunningBuildsBySerialGroup(jobConfig.Name, jobConfig.GetSerialGroups())
+		if err != nil {
+			logger.Error("failed-to-get-running-builds-by-serial-group", err)
+			return false, err
+		}
+
+		if len(builds) >= maxInFlight {
+			return true, nil
+		}
+
+		nextMostPendingBuild, found, err := s.DB.GetNextPendingBuildBySerialGroup(jobConfig.Name, jobConfig.GetSerialGroups())
+		if err != nil {
+			logger.Error("failed-to-get-next-pending-build-by-serial-group", err)
+			return false, err
+		}
+
+		if !found {
+			logger.Debug("pending-build-disappeared-from-serial-group") // TODO: refactor serial groups
+			return true, nil
+		}
+
+		return nextMostPendingBuild.ID != buildID, nil
+	}
+
+	return false, nil
 }

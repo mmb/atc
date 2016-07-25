@@ -126,7 +126,7 @@ var _ = Describe("Leases", func() {
 		})
 	})
 
-	FDescribe("LeaseResourceCheckingForJob", func() {
+	Describe("LeaseResourceCheckingForJob", func() {
 		BeforeEach(func() {
 			_, _, err := pipelineDB.GetResource("some-resource")
 			Expect(err).NotTo(HaveOccurred())

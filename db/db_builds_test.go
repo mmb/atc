@@ -12,7 +12,7 @@ import (
 )
 
 func createAndFinishBuild(database db.DB, pipelineDB db.PipelineDB, jobName string, status db.Status) db.Build {
-	build, err := pipelineDB.CreateJobBuild(jobName)
+	build, err := pipelineDB.CreateJobBuild(jobName, false)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = database.FinishBuild(build.ID, build.PipelineID, status)
@@ -22,7 +22,7 @@ func createAndFinishBuild(database db.DB, pipelineDB db.PipelineDB, jobName stri
 }
 
 func createAndStartBuild(database db.DB, pipelineDB db.PipelineDB, jobName string, engineName string) db.Build {
-	build, err := pipelineDB.CreateJobBuild(jobName)
+	build, err := pipelineDB.CreateJobBuild(jobName, false)
 	Expect(err).NotTo(HaveOccurred())
 
 	started, err := database.StartBuild(build.ID, build.PipelineID, engineName, "so-meta")
@@ -107,7 +107,7 @@ var _ = Describe("Keeping track of builds", func() {
 	})
 
 	It("can get a build's inputs", func() {
-		build, err := pipelineDB.CreateJobBuild("some-job")
+		build, err := pipelineDB.CreateJobBuild("some-job", false)
 		Expect(err).ToNot(HaveOccurred())
 
 		expectedBuildInput, err := pipelineDB.SaveBuildInput(build.ID, db.BuildInput{
@@ -141,7 +141,7 @@ var _ = Describe("Keeping track of builds", func() {
 	})
 
 	It("can get a build's output", func() {
-		build, err := pipelineDB.CreateJobBuild("some-job")
+		build, err := pipelineDB.CreateJobBuild("some-job", false)
 		Expect(err).ToNot(HaveOccurred())
 
 		expectedBuildOutput, err := pipelineDB.SaveBuildOutput(build.ID, db.VersionedResource{
@@ -192,16 +192,16 @@ var _ = Describe("Keeping track of builds", func() {
 	})
 
 	It("can find latest successful builds per job", func() {
-		savedBuild0, err := pipelineDB.CreateJobBuild("some-job")
+		savedBuild0, err := pipelineDB.CreateJobBuild("some-job", false)
 		Expect(err).NotTo(HaveOccurred())
 
-		savedBuild1, err := pipelineDB.CreateJobBuild("some-job")
+		savedBuild1, err := pipelineDB.CreateJobBuild("some-job", false)
 		Expect(err).NotTo(HaveOccurred())
 
-		savedBuild2, err := pipelineDB.CreateJobBuild("some-other-job")
+		savedBuild2, err := pipelineDB.CreateJobBuild("some-other-job", false)
 		Expect(err).NotTo(HaveOccurred())
 
-		savedBuild3, err := pipelineDB.CreateJobBuild("some-random-job")
+		savedBuild3, err := pipelineDB.CreateJobBuild("some-random-job", false)
 		Expect(err).NotTo(HaveOccurred())
 
 		err = database.FinishBuild(savedBuild0.ID, pipeline.ID, db.StatusSucceeded)
@@ -254,7 +254,7 @@ var _ = Describe("Keeping track of builds", func() {
 			Expect(found).To(BeTrue())
 			Expect(oneOffGot).To(Equal(oneOff))
 
-			jobBuild, err := pipelineDB.CreateJobBuild("some-other-job")
+			jobBuild, err := pipelineDB.CreateJobBuild("some-other-job", false)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(jobBuild.Name).To(Equal("1"))
 
@@ -316,7 +316,7 @@ var _ = Describe("Keeping track of builds", func() {
 		var originalBuildPrep db.BuildPreparation
 
 		BeforeEach(func() {
-			build, err := pipelineDB.CreateJobBuild("some-job")
+			build, err := pipelineDB.CreateJobBuild("some-job", false)
 			Expect(err).NotTo(HaveOccurred())
 			buildID = build.ID
 
@@ -398,7 +398,7 @@ var _ = Describe("Keeping track of builds", func() {
 			build1, err = database.CreateOneOffBuild()
 			Expect(err).NotTo(HaveOccurred())
 
-			build2, err = pipelineDB.CreateJobBuild("some-job")
+			build2, err = pipelineDB.CreateJobBuild("some-job", false)
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = database.CreateOneOffBuild()
@@ -454,7 +454,7 @@ var _ = Describe("Keeping track of builds", func() {
 
 				for i := 3; i < 5; i++ {
 					var err error
-					allBuilds[i], err = pipelineDB.CreateJobBuild("some-job")
+					allBuilds[i], err = pipelineDB.CreateJobBuild("some-job", false)
 					Expect(err).NotTo(HaveOccurred())
 				}
 			})

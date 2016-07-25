@@ -54,8 +54,8 @@ func (rsf *radarSchedulerFactory) BuildScheduler(pipelineDB db.PipelineDB, exter
 		externalURL,
 	)
 	return &scheduler.Scheduler{
-		PipelineDB: pipelineDB,
-		BuildsDB:   rsf.db,
+		DB:       pipelineDB,
+		BuildsDB: rsf.db,
 		Factory: factory.NewBuildFactory(
 			pipelineDB.GetPipelineID(),
 			atc.NewPlanFactory(time.Now().Unix()),
