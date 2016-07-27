@@ -104,7 +104,7 @@ var _ = Describe("Keeping track of containers", func() {
 	}
 
 	getJobBuildID := func(jobName string) int {
-		savedBuild, err := pipelineDB.CreateJobBuild(jobName, false)
+		savedBuild, err := pipelineDB.CreateJobBuild(jobName)
 		Expect(err).NotTo(HaveOccurred())
 		return savedBuild.ID
 	}
@@ -116,19 +116,19 @@ var _ = Describe("Keeping track of containers", func() {
 	}
 
 	It("can find non-one-off containers from unsuccessful builds", func() {
-		savedBuild0, err := pipelineDB.CreateJobBuild("some-job", false)
+		savedBuild0, err := pipelineDB.CreateJobBuild("some-job")
 		Expect(err).NotTo(HaveOccurred())
 
-		savedBuild1, err := pipelineDB.CreateJobBuild("some-other-job", false)
+		savedBuild1, err := pipelineDB.CreateJobBuild("some-other-job")
 		Expect(err).NotTo(HaveOccurred())
 
 		savedBuild2, err := database.CreateOneOffBuild()
 		Expect(err).NotTo(HaveOccurred())
 
-		savedBuild3, err := pipelineDB.CreateJobBuild("some-random-job", false)
+		savedBuild3, err := pipelineDB.CreateJobBuild("some-random-job")
 		Expect(err).NotTo(HaveOccurred())
 
-		savedBuild4, err := pipelineDB.CreateJobBuild("some-job", false)
+		savedBuild4, err := pipelineDB.CreateJobBuild("some-job")
 		Expect(err).NotTo(HaveOccurred())
 
 		err = database.FinishBuild(savedBuild0.ID, savedPipeline.ID, db.StatusErrored)
@@ -409,7 +409,7 @@ var _ = Describe("Keeping track of containers", func() {
 	})
 
 	It("can populate metadata that was omitted when creating the container", func() {
-		savedBuild, err := pipelineDB.CreateJobBuild("some-job", false)
+		savedBuild, err := pipelineDB.CreateJobBuild("some-job")
 		Expect(err).NotTo(HaveOccurred())
 
 		containerToCreate := db.Container{
@@ -1325,11 +1325,11 @@ var _ = Describe("Keeping track of containers", func() {
 		}),
 
 		Entry("returns containers where the build name matches", func() findContainersByDescriptorsExample {
-			savedBuild1, err := pipelineDB.CreateJobBuild("some-job", false)
+			savedBuild1, err := pipelineDB.CreateJobBuild("some-job")
 			Expect(err).NotTo(HaveOccurred())
-			savedBuild2, err := pipelineDB.CreateJobBuild("some-job", false)
+			savedBuild2, err := pipelineDB.CreateJobBuild("some-job")
 			Expect(err).NotTo(HaveOccurred())
-			savedBuild3, err := pipelineDB.CreateJobBuild("some-other-job", false)
+			savedBuild3, err := pipelineDB.CreateJobBuild("some-other-job")
 			Expect(err).NotTo(HaveOccurred())
 			return findContainersByDescriptorsExample{
 				containersToCreate: []db.Container{

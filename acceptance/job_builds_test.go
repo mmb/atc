@@ -91,7 +91,7 @@ var _ = Describe("Job Builds", func() {
 
 				BeforeEach(func() {
 					for i := 1; i < 104; i++ {
-						build, err := pipelineDB.CreateJobBuild("job-name", false)
+						build, err := pipelineDB.CreateJobBuild("job-name")
 						Expect(err).NotTo(HaveOccurred())
 						testBuilds = append(testBuilds, build)
 					}

@@ -12,7 +12,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Input Versions", func() {
+var _ = Describe("next build inputs for job", func() {
 	var dbConn db.Conn
 	var listener *pq.Listener
 
@@ -71,7 +71,7 @@ var _ = Describe("Input Versions", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// save metadata for v1
-		build, err := pipelineDB.CreateJobBuild("some-job", false)
+		build, err := pipelineDB.CreateJobBuild("some-job")
 		Expect(err).ToNot(HaveOccurred())
 		_, err = pipelineDB.SaveBuildInput(build.ID, db.BuildInput{
 			Name: "some-input",
@@ -107,8 +107,8 @@ var _ = Describe("Input Versions", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	Describe("can save and get ideal input versions", func() {
-		It("gets ideal input versions for the given job name", func() {
+	Describe("independent build inputs", func() {
+		It("gets independent build inputs for the given job name", func() {
 			inputVersions := algorithm.InputMapping{
 				"some-input-1": algorithm.InputVersion{
 					VersionID:       versions[0].ID,
@@ -119,7 +119,7 @@ var _ = Describe("Input Versions", func() {
 					FirstOccurrence: true,
 				},
 			}
-			err := pipelineDB.SaveIdealInputVersions(inputVersions, "some-job")
+			err := pipelineDB.SaveIndependentInputMapping(inputVersions, "some-job")
 			Expect(err).NotTo(HaveOccurred())
 
 			pipeline2InputVersions := algorithm.InputMapping{
@@ -128,7 +128,7 @@ var _ = Describe("Input Versions", func() {
 					FirstOccurrence: false,
 				},
 			}
-			err = pipelineDB2.SaveIdealInputVersions(pipeline2InputVersions, "some-job")
+			err = pipelineDB2.SaveIndependentInputMapping(pipeline2InputVersions, "some-job")
 			Expect(err).NotTo(HaveOccurred())
 
 			buildInputs := []db.BuildInput{
@@ -144,12 +144,12 @@ var _ = Describe("Input Versions", func() {
 				},
 			}
 
-			actualBuildInputs, err := pipelineDB.GetIdealBuildInputs("some-job")
+			actualBuildInputs, err := pipelineDB.GetIndependentBuildInputs("some-job")
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(actualBuildInputs).To(ConsistOf(buildInputs))
 
-			By("updating the set of ideal input versions")
+			By("updating the set of independent build inputs")
 			inputVersions2 := algorithm.InputMapping{
 				"some-input-2": algorithm.InputVersion{
 					VersionID:       versions[2].ID,
@@ -160,7 +160,7 @@ var _ = Describe("Input Versions", func() {
 					FirstOccurrence: true,
 				},
 			}
-			err = pipelineDB.SaveIdealInputVersions(inputVersions2, "some-job")
+			err = pipelineDB.SaveIndependentInputMapping(inputVersions2, "some-job")
 			Expect(err).NotTo(HaveOccurred())
 
 			buildInputs2 := []db.BuildInput{
@@ -176,22 +176,22 @@ var _ = Describe("Input Versions", func() {
 				},
 			}
 
-			actualBuildInputs2, err := pipelineDB.GetIdealBuildInputs("some-job")
+			actualBuildInputs2, err := pipelineDB.GetIndependentBuildInputs("some-job")
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(actualBuildInputs2).To(ConsistOf(buildInputs2))
 
-			By("deleting all ideal input versions for the job")
-			err = pipelineDB.SaveIdealInputVersions(nil, "some-job")
+			By("updating independent build inputs to an empty set when the mapping is nil")
+			err = pipelineDB.SaveIndependentInputMapping(nil, "some-job")
 			Expect(err).NotTo(HaveOccurred())
 
-			actualBuildInputs3, err := pipelineDB.GetIdealBuildInputs("some-job")
+			actualBuildInputs3, err := pipelineDB.GetIndependentBuildInputs("some-job")
 			Expect(actualBuildInputs3).To(BeEmpty())
 		})
 	})
 
-	Describe("can save and get compromise input versions", func() {
-		It("gets compromise input versions for the given job name", func() {
+	Describe("next build inputs", func() {
+		It("gets next build inputs for the given job name", func() {
 			inputVersions := algorithm.InputMapping{
 				"some-input-1": algorithm.InputVersion{
 					VersionID:       versions[0].ID,
@@ -202,7 +202,7 @@ var _ = Describe("Input Versions", func() {
 					FirstOccurrence: true,
 				},
 			}
-			err := pipelineDB.SaveCompromiseInputVersions(inputVersions, "some-job")
+			err := pipelineDB.SaveNextInputMapping(inputVersions, "some-job")
 			Expect(err).NotTo(HaveOccurred())
 
 			pipeline2InputVersions := algorithm.InputMapping{
@@ -211,7 +211,7 @@ var _ = Describe("Input Versions", func() {
 					FirstOccurrence: false,
 				},
 			}
-			err = pipelineDB2.SaveCompromiseInputVersions(pipeline2InputVersions, "some-job")
+			err = pipelineDB2.SaveNextInputMapping(pipeline2InputVersions, "some-job")
 			Expect(err).NotTo(HaveOccurred())
 
 			buildInputs := []db.BuildInput{
@@ -227,12 +227,13 @@ var _ = Describe("Input Versions", func() {
 				},
 			}
 
-			actualBuildInputs, err := pipelineDB.GetCompromiseBuildInputs("some-job")
+			actualBuildInputs, found, err := pipelineDB.GetNextBuildInputs("some-job")
 			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(BeTrue())
 
 			Expect(actualBuildInputs).To(ConsistOf(buildInputs))
 
-			By("updating the set of compromise input versions")
+			By("updating the set of next build inputs")
 			inputVersions2 := algorithm.InputMapping{
 				"some-input-2": algorithm.InputVersion{
 					VersionID:       versions[2].ID,
@@ -243,7 +244,7 @@ var _ = Describe("Input Versions", func() {
 					FirstOccurrence: true,
 				},
 			}
-			err = pipelineDB.SaveCompromiseInputVersions(inputVersions2, "some-job")
+			err = pipelineDB.SaveNextInputMapping(inputVersions2, "some-job")
 			Expect(err).NotTo(HaveOccurred())
 
 			buildInputs2 := []db.BuildInput{
@@ -259,17 +260,43 @@ var _ = Describe("Input Versions", func() {
 				},
 			}
 
-			actualBuildInputs2, err := pipelineDB.GetCompromiseBuildInputs("some-job")
+			actualBuildInputs2, found, err := pipelineDB.GetNextBuildInputs("some-job")
 			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(BeTrue())
 
 			Expect(actualBuildInputs2).To(ConsistOf(buildInputs2))
 
-			By("deleting all compromise input versions for the job")
-			err = pipelineDB.SaveCompromiseInputVersions(nil, "some-job")
+			By("updating next build inputs to an empty set when the mapping is nil")
+			err = pipelineDB.SaveNextInputMapping(nil, "some-job")
 			Expect(err).NotTo(HaveOccurred())
 
-			actualBuildInputs3, err := pipelineDB.GetCompromiseBuildInputs("some-job")
+			actualBuildInputs3, found, err := pipelineDB.GetNextBuildInputs("some-job")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(BeTrue())
 			Expect(actualBuildInputs3).To(BeEmpty())
+		})
+
+		It("distinguishes between a job with no inputs and a job with missing inputs", func() {
+			By("initially returning not found")
+			_, found, err := pipelineDB.GetNextBuildInputs("some-job")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(BeFalse())
+
+			By("returning found when an empty input mapping is saved")
+			err = pipelineDB.SaveNextInputMapping(algorithm.InputMapping{}, "some-job")
+			Expect(err).NotTo(HaveOccurred())
+
+			_, found, err = pipelineDB.GetNextBuildInputs("some-job")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(BeTrue())
+
+			By("returning not found when the input mapping is deleted")
+			err = pipelineDB.DeleteNextInputMapping("some-job")
+			Expect(err).NotTo(HaveOccurred())
+
+			_, found, err = pipelineDB.GetNextBuildInputs("some-job")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(BeFalse())
 		})
 	})
 })

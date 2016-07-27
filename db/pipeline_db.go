@@ -61,30 +61,28 @@ type PipelineDB interface {
 	GetAllJobBuilds(job string) ([]Build, error)
 
 	GetJobBuild(job string, build string) (Build, bool, error)
-	CreateJobBuild(job string, requireResourceChecking bool) (Build, error)
+	CreateJobBuild(job string) (Build, error)
 	CreateJobBuildForCandidateInputs(job string) (Build, bool, error)
-
-	LeaseResourceCheckingForJob(logger lager.Logger, job string, interval time.Duration) (Lease, bool, error)
-	LeaseResourceCheckingForJobAcquired(jobName string) (bool, error)
-
+	EnsurePendingBuildExists(jobName string) error
+	GetNextPendingBuild(jobName string) (Build, bool, error)
 	UseInputsForBuild(buildID int, inputs []BuildInput) error
+	LeaseResourceCheckingForJob(logger lager.Logger, jobName string, interval time.Duration) (Lease, error)
 
 	LoadVersionsDB() (*algorithm.VersionsDB, error)
 	GetNextInputVersions(versions *algorithm.VersionsDB, job string, inputs []config.JobInput) ([]BuildInput, bool, MissingInputReasons, error)
 	GetMissingInputReasons(
 		algorithmInputConfigs algorithm.InputConfigs,
 		inputs []config.JobInput,
-		idealMapping algorithm.InputMapping,
+		independentMapping algorithm.InputMapping,
 	) (MissingInputReasons, error)
 	GetAlgorithmInputConfigs(db *algorithm.VersionsDB, jobName string, inputs []config.JobInput) (algorithm.InputConfigs, error)
-	SaveIdealInputVersions(inputVersions algorithm.InputMapping, jobName string) error
-	GetIdealBuildInputs(jobName string) ([]BuildInput, error)
-	SaveCompromiseInputVersions(inputVersions algorithm.InputMapping, jobName string) error
-	GetCompromiseBuildInputs(jobName string) ([]BuildInput, error)
-	DeleteCompromiseInputVersions(jobName string) error
+	SaveIndependentInputMapping(inputVersions algorithm.InputMapping, jobName string) error
+	GetIndependentBuildInputs(jobName string) ([]BuildInput, error)
+	SaveNextInputMapping(inputVersions algorithm.InputMapping, jobName string) error
+	GetNextBuildInputs(jobName string) ([]BuildInput, bool, error)
+	DeleteNextInputMapping(jobName string) error
 
 	GetJobBuildForInputs(job string, inputs []BuildInput) (Build, bool, error)
-	GetNextPendingBuild(job string) (Build, bool, error)
 
 	GetBuild(buildID int) (Build, bool, error)
 	GetCurrentBuild(job string) (Build, bool, error)
@@ -109,8 +107,6 @@ type pipelineDB struct {
 	SavedPipeline
 
 	versionsDB *algorithm.VersionsDB
-
-	buildPrepHelper buildPreparationHelper
 }
 
 type ResourceNotFoundError struct {
@@ -359,18 +355,12 @@ func (pdb *pipelineDB) LeaseResourceChecking(logger lager.Logger, resourceName s
 		},
 	}
 
-	renewed, err := lease.AttemptSign(interval)
+	acquired, err := lease.Acquire(interval)
 	if err != nil {
 		return nil, false, err
 	}
 
-	if !renewed {
-		return nil, renewed, nil
-	}
-
-	lease.KeepSigned(interval)
-
-	return lease, true, nil
+	return lease, acquired, nil
 }
 
 func (pdb *pipelineDB) LeaseResourceTypeChecking(logger lager.Logger, resourceTypeName string, interval time.Duration, immediate bool) (Lease, bool, error) {
@@ -420,18 +410,12 @@ func (pdb *pipelineDB) LeaseResourceTypeChecking(logger lager.Logger, resourceTy
 		},
 	}
 
-	renewed, err := lease.AttemptSign(interval)
+	acquired, err := lease.Acquire(interval)
 	if err != nil {
 		return nil, false, err
 	}
 
-	if !renewed {
-		return nil, renewed, nil
-	}
-
-	lease.KeepSigned(interval)
-
-	return lease, true, nil
+	return lease, acquired, nil
 }
 
 func (pdb *pipelineDB) LeaseScheduling(logger lager.Logger, interval time.Duration) (Lease, bool, error) {
@@ -457,97 +441,69 @@ func (pdb *pipelineDB) LeaseScheduling(logger lager.Logger, interval time.Durati
 		},
 	}
 
-	renewed, err := lease.AttemptSign(interval)
+	acquired, err := lease.Acquire(interval)
 	if err != nil {
 		return nil, false, err
 	}
 
-	if !renewed {
-		return nil, renewed, nil
-	}
-
-	lease.KeepSigned(interval)
-
-	return lease, true, nil
+	return lease, acquired, nil
 }
 
-func (pdb *pipelineDB) LeaseResourceCheckingForJob(logger lager.Logger, job string, interval time.Duration) (Lease, bool, error) {
+func (pdb *pipelineDB) LeaseResourceCheckingForJob(logger lager.Logger, jobName string, interval time.Duration) (Lease, error) {
 	lease := &lease{
 		conn: pdb.conn,
 		logger: logger.Session("lease", lager.Data{
-			"job_name": job,
+			"job_name": jobName,
 		}),
 		attemptSignFunc: func(tx Tx) (sql.Result, error) {
-			result, err := tx.Exec(`
-				UPDATE builds b
-				SET requires_resources_checked_after = 'epoch'
-				FROM jobs j
-				WHERE j.name = $1
-					AND j.pipeline_id = $2
-					AND b.job_id = j.id
-					AND resource_checking_expires_at <= now()
-					AND b.requires_resources_checked_after < j.resource_checking_start
-				`, job, pdb.ID)
+			var resourceCheckWaiverEnd int
+			err := tx.QueryRow(`
+				SELECT COALESCE(MAX(b.id), 0)
+					FROM builds b
+					JOIN jobs j ON b.job_id = j.id
+					WHERE j.name = $1
+						AND j.pipeline_id = $2
+			`, jobName, pdb.ID).Scan(&resourceCheckWaiverEnd)
 			if err != nil {
-				return result, err
+				return nil, err
 			}
 
 			return tx.Exec(`
 					UPDATE jobs
-					SET resource_checking_expires_at = now() + ($3 || ' SECONDS')::INTERVAL,
-						resource_checking_start = now()
+					SET resource_check_waiver_end = $4,
+						resource_check_finished_at = now() + ($3 || ' SECONDS')::INTERVAL
 					WHERE name = $1
 						AND pipeline_id = $2
-						AND resource_checking_expires_at <= now()
-				`, job, pdb.ID, interval.Seconds())
+						AND resource_check_finished_at <= now()
+				`, jobName, pdb.ID, interval.Seconds(), resourceCheckWaiverEnd)
 		},
 		heartbeatFunc: func(tx Tx) (sql.Result, error) {
 			return tx.Exec(`
 					UPDATE jobs
-					SET resource_checking_expires_at = now() + ($3 || ' SECONDS')::INTERVAL
+					SET resource_check_finished_at = now() + ($3 || ' SECONDS')::INTERVAL
 					WHERE name = $1
 						AND pipeline_id = $2
-				`, job, pdb.ID, interval.Seconds())
+				`, jobName, pdb.ID, interval.Seconds())
 		},
 		breakFunc: func() {
 			_, err := pdb.conn.Exec(`
 					UPDATE jobs
-					SET resource_checking_expires_at = 'epoch'
+					SET resource_check_finished_at = 'epoch'
 					WHERE name = $1
 						AND pipeline_id = $2
-				`, job, pdb.ID)
+				`, jobName, pdb.ID)
 			if err != nil {
 				logger.Error("failed-to-reset-checking-state", err)
 			}
 		},
 	}
 
-	renewed, err := lease.AttemptSign(interval)
+	_, err := lease.Acquire(interval)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
-	if !renewed {
-		return nil, renewed, nil
-	}
-
-	lease.KeepSigned(interval)
-
-	return lease, true, nil
-}
-
-func (pdb *pipelineDB) LeaseResourceCheckingForJobAcquired(jobName string) (bool, error) {
-	var acquired bool
-	err := pdb.conn.QueryRow(`
-		SELECT resource_checking_expires_at > now()
-		FROM jobs
-		WHERE name = $1
-			AND pipeline_id = $2
-		`, jobName, pdb.ID).Scan(&acquired)
-	if err != nil {
-		return false, err
-	}
-	return acquired, nil
+	return lease, nil
 }
 
 func (pdb *pipelineDB) GetResourceVersions(resourceName string, page Page) ([]SavedVersionedResource, Pagination, bool, error) {
@@ -1175,46 +1131,6 @@ func (pdb *pipelineDB) GetJobBuild(job string, name string) (Build, bool, error)
 
 //TODO: delete this
 func (pdb *pipelineDB) CreateJobBuildForCandidateInputs(jobName string) (Build, bool, error) {
-	tx, err := pdb.conn.Begin()
-	if err != nil {
-		return Build{}, false, err
-	}
-
-	defer tx.Rollback()
-
-	var x int
-	err = tx.QueryRow(`
-		SELECT 1
-		FROM builds b
-			INNER JOIN jobs j ON b.job_id = j.id
-			INNER JOIN pipelines p ON j.pipeline_id = p.id
-		WHERE j.name = $1
-			AND p.id = $2
-			AND b.inputs_determined = false
-			AND b.status IN ('pending', 'started')
-	`, jobName, pdb.ID).Scan(&x)
-
-	if err == sql.ErrNoRows {
-		build, err := pdb.createJobBuild(jobName, false, tx)
-		if err != nil {
-			return Build{}, false, err
-		}
-
-		err = tx.Commit()
-		if err != nil {
-			return Build{}, false, err
-		}
-
-		return build, true, nil
-	} else if err != nil {
-		return Build{}, false, err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return Build{}, false, err
-	}
-
 	return Build{}, false, nil
 }
 
@@ -1262,7 +1178,7 @@ func (pdb *pipelineDB) UseInputsForBuild(buildID int, inputs []BuildInput) error
 	return tx.Commit()
 }
 
-func (pdb *pipelineDB) CreateJobBuild(jobName string, requireResourceChecking bool) (Build, error) {
+func (pdb *pipelineDB) CreateJobBuild(jobName string) (Build, error) {
 	tx, err := pdb.conn.Begin()
 	if err != nil {
 		return Build{}, err
@@ -1270,7 +1186,26 @@ func (pdb *pipelineDB) CreateJobBuild(jobName string, requireResourceChecking bo
 
 	defer tx.Rollback()
 
-	build, err := pdb.createJobBuild(jobName, requireResourceChecking, tx)
+	buildName, jobID, err := getNewBuildNameForJob(tx, jobName, pdb.ID)
+	if err != nil {
+		return Build{}, err
+	}
+
+	// We had to resort to sub-selects here because you can't paramaterize a
+	// RETURNING statement in lib/pq... sorry
+	build, _, err := scanBuild(tx.QueryRow(`
+		INSERT INTO builds (name, job_id, status)
+		VALUES ($1, $2, 'pending')
+		RETURNING `+buildColumns+`,
+			(SELECT name FROM jobs WHERE id = $2),
+			(SELECT id FROM pipelines WHERE id = $3),
+			(SELECT name FROM pipelines WHERE id = $3)
+	`, buildName, jobID, pdb.ID))
+	if err != nil {
+		return Build{}, err
+	}
+
+	err = createBuildEventSeq(tx, build.ID)
 	if err != nil {
 		return Build{}, err
 	}
@@ -1283,69 +1218,69 @@ func (pdb *pipelineDB) CreateJobBuild(jobName string, requireResourceChecking bo
 	return build, nil
 }
 
-func (pdb *pipelineDB) createJobBuild(jobName string, requireResourceChecking bool, tx Tx) (Build, error) {
-	dbJob, err := pdb.getJob(tx, jobName)
+func (pdb *pipelineDB) EnsurePendingBuildExists(jobName string) error {
+	tx, err := pdb.conn.Begin()
 	if err != nil {
-		return Build{}, err
+		return err
 	}
 
-	var name string
+	defer tx.Rollback()
 
-	err = tx.QueryRow(`
+	buildName, jobID, err := getNewBuildNameForJob(tx, jobName, pdb.ID)
+	if err != nil {
+		return err
+	}
+
+	rows, err := tx.Query(`
+		INSERT INTO builds (name, job_id, status)
+		SELECT $1, $2, 'pending'
+		WHERE NOT EXISTS
+			(SELECT id FROM builds WHERE job_id = $2 AND status = 'pending')
+		RETURNING id
+	`, buildName, jobID)
+	if err != nil {
+		return err
+	}
+
+	defer rows.Close()
+
+	if rows.Next() {
+		var buildID int
+		err := rows.Scan(&buildID)
+		if err != nil {
+			return err
+		}
+
+		rows.Close()
+
+		err = createBuildEventSeq(tx, buildID)
+		if err != nil {
+			return err
+		}
+
+		return tx.Commit()
+	}
+
+	return nil
+}
+
+func getNewBuildNameForJob(tx Tx, jobName string, pipelineID int) (string, int, error) {
+	var buildName string
+	var jobID int
+	err := tx.QueryRow(`
 		UPDATE jobs
 		SET build_number_seq = build_number_seq + 1
-		WHERE id = $1
-		RETURNING build_number_seq
-	`, dbJob.ID).Scan(&name)
-	if err != nil {
-		return Build{}, err
-	}
+		WHERE name = $1 AND pipeline_id = $2
+		RETURNING build_number_seq, id
+	`, jobName, pipelineID).Scan(&buildName, &jobID)
+	return buildName, jobID, err
+}
 
-	// We had to resort to sub-selects here because you can't paramaterize a
-	// RETURNING statement in lib/pq... sorry
-	timeQuery := "'epoch'"
-	if requireResourceChecking {
-		timeQuery = "now()"
-	}
-
-	build, _, err := scanBuild(tx.QueryRow(`
-		INSERT INTO builds (name, job_id, status, requires_resources_checked_after)
-		VALUES ($1, $2, 'pending', `+timeQuery+`)
-		RETURNING `+buildColumns+`,
-			(
-				SELECT j.name
-				FROM jobs j
-				WHERE j.id = job_id
-			),
-			(
-				SELECT j.pipeline_id
-				FROM jobs j
-				WHERE j.id = job_id
-			),
-			(
-				SELECT p.name
-				FROM jobs j
-				INNER JOIN pipelines p ON j.pipeline_id = p.id
-				WHERE j.id = job_id
-			)
-	`, name, dbJob.ID))
-	if err != nil {
-		return Build{}, err
-	}
-
-	_, err = tx.Exec(fmt.Sprintf(`
+func createBuildEventSeq(tx Tx, buildID int) error {
+	_, err := tx.Exec(fmt.Sprintf(`
 		CREATE SEQUENCE %s MINVALUE 0
-	`, buildEventSeq(build.ID)))
-	if err != nil {
-		return Build{}, err
-	}
-
-	err = pdb.buildPrepHelper.CreateBuildPreparation(tx, build.ID)
-	if err != nil {
-		return Build{}, err
-	}
-
-	return build, nil
+	`, buildEventSeq(buildID)))
+	return err
 }
 
 func (pdb *pipelineDB) GetBuildsWithVersionAsInput(versionedResourceID int) ([]Build, error) {
@@ -1372,7 +1307,7 @@ func (pdb *pipelineDB) GetBuildsWithVersionAsInput(versionedResourceID int) ([]B
 		builds = append(builds, build)
 	}
 
-	return builds, err
+	return nil, nil
 }
 
 func (pdb *pipelineDB) GetBuildsWithVersionAsOutput(versionedResourceID int) ([]Build, error) {
@@ -1510,86 +1445,10 @@ func (pdb *pipelineDB) SaveBuildOutput(buildID int, vr VersionedResource, explic
 }
 
 func (pdb *pipelineDB) GetJobBuildForInputs(job string, inputs []BuildInput) (Build, bool, error) {
-	tx, err := pdb.conn.Begin()
-	if err != nil {
-		return Build{}, false, err
-	}
-
-	defer tx.Rollback()
-
-	dbJob, err := pdb.getJob(tx, job)
-	if err != nil {
-		return Build{}, false, err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return Build{}, false, err
-	}
-
-	from := []string{"builds b"}
-	from = append(from, "jobs j")
-	from = append(from, "pipelines p")
-	conditions := []string{"job_id = $1"}
-	conditions = append(conditions, "b.job_id = j.id")
-	conditions = append(conditions, "j.pipeline_id = p.id")
-	params := []interface{}{dbJob.ID}
-
-	for i, input := range inputs {
-		vr := input.VersionedResource
-		dbResource, found, err := pdb.GetResource(vr.Resource)
-		if err != nil {
-			return Build{}, false, err
-		}
-
-		if !found {
-			return Build{}, false, ResourceNotFoundError{Name: vr.Resource}
-		}
-
-		versionBytes, err := json.Marshal(vr.Version)
-		if err != nil {
-			return Build{}, false, err
-		}
-
-		var id int
-
-		err = pdb.conn.QueryRow(`
-			SELECT id
-			FROM versioned_resources
-			WHERE resource_id = $1
-			AND type = $2
-			AND version = $3
-		`, dbResource.ID, vr.Type, string(versionBytes)).Scan(&id)
-		if err == sql.ErrNoRows {
-			return Build{}, false, nil
-		}
-
-		if err != nil {
-			return Build{}, false, err
-		}
-
-		from = append(from, fmt.Sprintf("build_inputs i%d", i+1))
-		params = append(params, id, input.Name)
-
-		conditions = append(conditions,
-			fmt.Sprintf("i%d.build_id = b.id", i+1),
-			fmt.Sprintf("i%d.versioned_resource_id = $%d", i+1, len(params)-1),
-			fmt.Sprintf("i%d.name = $%d", i+1, len(params)),
-		)
-	}
-
-	return scanBuild(pdb.conn.QueryRow(fmt.Sprintf(`
-		SELECT `+qualifiedBuildColumns+`
-		FROM %s
-		WHERE %s
-		`,
-		strings.Join(from, ", "),
-		strings.Join(conditions, "\nAND ")),
-		params...,
-	))
+	return Build{}, false, nil
 }
 
-func (pdb *pipelineDB) GetNextPendingBuild(job string) (Build, bool, error) {
+func (pdb *pipelineDB) GetNextPendingBuild(jobName string) (Build, bool, error) {
 	tx, err := pdb.conn.Begin()
 	if err != nil {
 		return Build{}, false, err
@@ -1597,7 +1456,7 @@ func (pdb *pipelineDB) GetNextPendingBuild(job string) (Build, bool, error) {
 
 	defer tx.Rollback()
 
-	dbJob, err := pdb.getJob(tx, job)
+	dbJob, err := pdb.getJob(tx, jobName)
 	if err != nil {
 		return Build{}, false, err
 	}
@@ -1615,8 +1474,8 @@ func (pdb *pipelineDB) GetNextPendingBuild(job string) (Build, bool, error) {
 		WHERE b.job_id = $1
 		AND b.status = 'pending'
 		AND (
-			(b.requires_resources_checked_after <= j.resource_checking_start AND j.resource_checking_expires_at <= now())
-			OR j.resource_checking_expires_at <= 'epoch'
+			b.id <= j.resource_check_waiver_end
+			OR j.resource_check_finished_at <= now()
 		)
 		ORDER BY b.id ASC
 		LIMIT 1
@@ -1740,19 +1599,7 @@ func (pdb *pipelineDB) GetBuild(buildID int) (Build, bool, error) {
 }
 
 func (pdb *pipelineDB) UpdateBuildPreparation(prep BuildPreparation) error {
-	tx, err := pdb.conn.Begin()
-	if err != nil {
-		return err
-	}
-
-	defer tx.Rollback()
-
-	err = pdb.buildPrepHelper.UpdateBuildPreparation(tx, prep)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	return nil
 }
 
 func (pdb *pipelineDB) IsPaused() (bool, error) {
@@ -2012,7 +1859,7 @@ func (pdb *pipelineDB) LoadVersionsDB() (*algorithm.VersionsDB, error) {
 func (pdb *pipelineDB) GetMissingInputReasons(
 	algorithmInputConfigs algorithm.InputConfigs,
 	inputs []config.JobInput,
-	idealMapping algorithm.InputMapping,
+	independentMapping algorithm.InputMapping,
 ) (MissingInputReasons, error) {
 	algorithmInputNameSet := map[string]struct{}{}
 	for _, algorithmInputConfig := range algorithmInputConfigs {
@@ -2028,7 +1875,7 @@ func (pdb *pipelineDB) GetMissingInputReasons(
 			}
 
 			missingInputReasons.RegisterPinnedVersionUnavailable(input.Name, string(versionJSON))
-		} else if _, ok := idealMapping[input.Name]; !ok {
+		} else if _, ok := independentMapping[input.Name]; !ok {
 			if len(input.Passed) > 0 {
 				missingInputReasons.RegisterPassedConstraint(input.Name)
 			} else {
@@ -2041,55 +1888,7 @@ func (pdb *pipelineDB) GetMissingInputReasons(
 }
 
 func (pdb *pipelineDB) GetNextInputVersions(versions *algorithm.VersionsDB, job string, inputs []config.JobInput) ([]BuildInput, bool, MissingInputReasons, error) {
-	algorithmInputConfigs, err := pdb.GetAlgorithmInputConfigs(versions, job, inputs)
-	if err != nil {
-		return nil, false, nil, err
-	}
-
-	idealMapping := algorithm.InputMapping{}
-	for _, inputConfig := range algorithmInputConfigs {
-		singletonMapping, ok := algorithm.InputConfigs{inputConfig}.Resolve(versions)
-		if ok {
-			idealMapping[inputConfig.Name] = singletonMapping[inputConfig.Name]
-		}
-	}
-
-	err = pdb.SaveIdealInputVersions(idealMapping, job)
-	if err != nil {
-		return nil, false, nil, err
-	}
-
-	//diff start
-	missingInputReasons, err := pdb.GetMissingInputReasons(algorithmInputConfigs, inputs, idealMapping)
-	if err != nil {
-		return nil, false, nil, err
-	}
-
-	if len(idealMapping) < len(inputs) { // important to not compare it to len(algorithmInputConfigs)
-		return nil, false, missingInputReasons, nil
-	}
-	//diff end
-
-	compromiseMapping, ok := algorithmInputConfigs.Resolve(versions)
-	if !ok {
-		err := pdb.SaveCompromiseInputVersions(nil, job)
-		if err != nil {
-			return nil, false, nil, err
-		}
-		return nil, false, missingInputReasons, nil
-	}
-
-	err = pdb.SaveCompromiseInputVersions(compromiseMapping, job)
-	if err != nil {
-		return nil, false, nil, err
-	}
-	//this only
-	buildInputs, err := pdb.GetIdealBuildInputs(job)
-	if err != nil {
-		return nil, false, nil, err
-	}
-
-	return buildInputs, true, missingInputReasons, nil
+	return nil, false, nil, nil
 }
 
 func (pdb *pipelineDB) GetAlgorithmInputConfigs(db *algorithm.VersionsDB, jobName string, inputs []config.JobInput) (algorithm.InputConfigs, error) {
@@ -2140,23 +1939,38 @@ func (pdb *pipelineDB) GetAlgorithmInputConfigs(db *algorithm.VersionsDB, jobNam
 	return inputConfigs, nil
 }
 
-func (pdb *pipelineDB) SaveIdealInputVersions(inputVersions algorithm.InputMapping, jobName string) error {
-	return pdb.saveInputVersions("ideal_input_versions", inputVersions, jobName)
+func (pdb *pipelineDB) SaveIndependentInputMapping(inputVersions algorithm.InputMapping, jobName string) error {
+	return pdb.saveJobInputMapping("independent_build_inputs", inputVersions, jobName)
 }
 
-func (pdb *pipelineDB) GetIdealBuildInputs(jobName string) ([]BuildInput, error) {
-	return pdb.getBuildInputs("ideal_input_versions", jobName)
+func (pdb *pipelineDB) GetIndependentBuildInputs(jobName string) ([]BuildInput, error) {
+	return pdb.getJobBuildInputs("independent_build_inputs", jobName)
 }
 
-func (pdb *pipelineDB) SaveCompromiseInputVersions(inputVersions algorithm.InputMapping, jobName string) error {
-	return pdb.saveInputVersions("compromise_input_versions", inputVersions, jobName)
+func (pdb *pipelineDB) SaveNextInputMapping(inputVersions algorithm.InputMapping, jobName string) error {
+	return pdb.saveJobInputMapping("next_build_inputs", inputVersions, jobName)
 }
 
-func (pdb *pipelineDB) GetCompromiseBuildInputs(jobName string) ([]BuildInput, error) {
-	return pdb.getBuildInputs("compromise_input_versions", jobName)
+func (pdb *pipelineDB) GetNextBuildInputs(jobName string) ([]BuildInput, bool, error) {
+	var found bool
+	err := pdb.conn.QueryRow(`
+			SELECT inputs_determined FROM jobs WHERE name = $1 AND pipeline_id = $2
+		`, jobName, pdb.ID).Scan(&found)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if !found {
+		return nil, false, nil
+	}
+
+	// there is a possible race condition where found is true at first but the
+	// inputs are deleted by the time we get here
+	buildInputs, err := pdb.getJobBuildInputs("next_build_inputs", jobName)
+	return buildInputs, true, err
 }
 
-func (pdb *pipelineDB) DeleteCompromiseInputVersions(jobName string) error {
+func (pdb *pipelineDB) DeleteNextInputMapping(jobName string) error {
 	tx, err := pdb.conn.Begin()
 	if err != nil {
 		return err
@@ -2176,7 +1990,7 @@ func (pdb *pipelineDB) DeleteCompromiseInputVersions(jobName string) error {
 	}
 
 	_, err = tx.Exec(`
-		DELETE FROM compromise_input_versions WHERE job_id = $1
+		DELETE FROM next_build_inputs WHERE job_id = $1
 		`, jobID)
 	if err != nil {
 		return err
@@ -2186,7 +2000,7 @@ func (pdb *pipelineDB) DeleteCompromiseInputVersions(jobName string) error {
 	return nil
 }
 
-func (pdb *pipelineDB) saveInputVersions(table string, inputVersions algorithm.InputMapping, jobName string) error {
+func (pdb *pipelineDB) saveJobInputMapping(table string, inputVersions algorithm.InputMapping, jobName string) error {
 	tx, err := pdb.conn.Begin()
 	if err != nil {
 		return err
@@ -2196,11 +2010,11 @@ func (pdb *pipelineDB) saveInputVersions(table string, inputVersions algorithm.I
 
 	var jobID int
 	switch table {
-	case "ideal_input_versions":
+	case "independent_build_inputs":
 		err = tx.QueryRow(`
 			SELECT id FROM jobs WHERE name = $1 AND pipeline_id = $2
 			`, jobName, pdb.ID).Scan(&jobID)
-	case "compromise_input_versions":
+	case "next_build_inputs":
 		err = tx.QueryRow(`
 			UPDATE jobs
 			SET inputs_determined = true
@@ -2235,7 +2049,7 @@ VALUES ($1, $2, $3, $4)
 	return nil
 }
 
-func (pdb *pipelineDB) getBuildInputs(table string, jobName string) ([]BuildInput, error) {
+func (pdb *pipelineDB) getJobBuildInputs(table string, jobName string) ([]BuildInput, error) {
 	rows, err := pdb.conn.Query(`
 		SELECT i.input_name, i.first_occurrence, r.name, v.type, v.version, v.metadata
 		FROM `+table+` i

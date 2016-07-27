@@ -541,7 +541,7 @@ var _ = Describe("Keeping track of volumes", func() {
 			Expect(err).NotTo(HaveOccurred())
 			oneOffBuildB, err := database.CreateOneOffBuild()
 			Expect(err).NotTo(HaveOccurred())
-			jobBuild, err := pipelineDB.CreateJobBuild("some-job", false)
+			jobBuild, err := pipelineDB.CreateJobBuild("some-job")
 			Expect(err).NotTo(HaveOccurred())
 
 			// To show that it returns volumes that are used in both one-off builds and job builds
