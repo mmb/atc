@@ -15,6 +15,7 @@ import (
 type BuildScheduler interface {
 	Schedule(logger lager.Logger, interval time.Duration) error
 	TriggerImmediately(logger lager.Logger, jobConfig atc.JobConfig, resourceConfigs atc.ResourceConfigs, resourceTypes atc.ResourceTypes) (db.Build, error)
+	SaveNextInputMapping(logger lager.Logger, job atc.JobConfig) error
 }
 
 var errPipelineRemoved = errors.New("pipeline removed")

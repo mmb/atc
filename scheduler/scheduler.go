@@ -317,6 +317,17 @@ func (s *Scheduler) TriggerImmediately(
 	return build, nil
 }
 
+func (s *Scheduler) SaveNextInputMapping(logger lager.Logger, job atc.JobConfig) error {
+	versions, err := s.DB.LoadVersionsDB()
+	if err != nil {
+		logger.Error("failed-to-load-versions-db", err)
+		return err
+	}
+
+	_, err = s.saveNextInputMapping(logger, versions, job)
+	return err
+}
+
 func (s *Scheduler) saveNextInputMapping(
 	logger lager.Logger,
 	versions *algorithm.VersionsDB,

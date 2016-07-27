@@ -33,6 +33,15 @@ type FakeBuildScheduler struct {
 		result1 db.Build
 		result2 error
 	}
+	SaveNextInputMappingStub        func(logger lager.Logger, job atc.JobConfig) error
+	saveNextInputMappingMutex       sync.RWMutex
+	saveNextInputMappingArgsForCall []struct {
+		logger lager.Logger
+		job    atc.JobConfig
+	}
+	saveNextInputMappingReturns struct {
+		result1 error
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -108,6 +117,40 @@ func (fake *FakeBuildScheduler) TriggerImmediatelyReturns(result1 db.Build, resu
 	}{result1, result2}
 }
 
+func (fake *FakeBuildScheduler) SaveNextInputMapping(logger lager.Logger, job atc.JobConfig) error {
+	fake.saveNextInputMappingMutex.Lock()
+	fake.saveNextInputMappingArgsForCall = append(fake.saveNextInputMappingArgsForCall, struct {
+		logger lager.Logger
+		job    atc.JobConfig
+	}{logger, job})
+	fake.recordInvocation("SaveNextInputMapping", []interface{}{logger, job})
+	fake.saveNextInputMappingMutex.Unlock()
+	if fake.SaveNextInputMappingStub != nil {
+		return fake.SaveNextInputMappingStub(logger, job)
+	} else {
+		return fake.saveNextInputMappingReturns.result1
+	}
+}
+
+func (fake *FakeBuildScheduler) SaveNextInputMappingCallCount() int {
+	fake.saveNextInputMappingMutex.RLock()
+	defer fake.saveNextInputMappingMutex.RUnlock()
+	return len(fake.saveNextInputMappingArgsForCall)
+}
+
+func (fake *FakeBuildScheduler) SaveNextInputMappingArgsForCall(i int) (lager.Logger, atc.JobConfig) {
+	fake.saveNextInputMappingMutex.RLock()
+	defer fake.saveNextInputMappingMutex.RUnlock()
+	return fake.saveNextInputMappingArgsForCall[i].logger, fake.saveNextInputMappingArgsForCall[i].job
+}
+
+func (fake *FakeBuildScheduler) SaveNextInputMappingReturns(result1 error) {
+	fake.SaveNextInputMappingStub = nil
+	fake.saveNextInputMappingReturns = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeBuildScheduler) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -115,6 +158,8 @@ func (fake *FakeBuildScheduler) Invocations() map[string][][]interface{} {
 	defer fake.scheduleMutex.RUnlock()
 	fake.triggerImmediatelyMutex.RLock()
 	defer fake.triggerImmediatelyMutex.RUnlock()
+	fake.saveNextInputMappingMutex.RLock()
+	defer fake.saveNextInputMappingMutex.RUnlock()
 	return fake.invocations
 }
 
