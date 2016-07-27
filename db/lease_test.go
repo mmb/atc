@@ -5,6 +5,7 @@ import (
 
 	"github.com/concourse/atc"
 	"github.com/concourse/atc/db"
+	"github.com/concourse/atc/db/dbfakes"
 	"github.com/lib/pq"
 	"github.com/pivotal-golang/lager/lagertest"
 
@@ -85,6 +86,33 @@ var _ = Describe("Leases", func() {
 		pipelineDB = pipelineDBFactory.Build(savedPipeline)
 	})
 
+	Describe("leases in general", func() {
+		Context("when its Break method is called more than once", func() {
+			It("only calls breakFunc the first time", func() {
+				goodResult := new(dbfakes.FakeSqlResult)
+				goodResult.RowsAffectedReturns(1, nil)
+
+				leaseTester := new(dbfakes.FakeLeaseTester)
+				leaseTester.AttemptSignReturns(goodResult, nil)
+				leaseTester.HeartbeatReturns(goodResult, nil)
+
+				lease, leased, err := db.NewLeaseForTesting(dbConn, logger, leaseTester, 1*time.Minute)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(leased).To(BeTrue())
+
+				Expect(leaseTester.BreakCallCount()).To(BeZero())
+				lease.Break()
+				Expect(leaseTester.BreakCallCount()).To(Equal(1))
+
+				lease.Break()
+				Expect(leaseTester.BreakCallCount()).To(Equal(1))
+
+				lease.Break()
+				Expect(leaseTester.BreakCallCount()).To(Equal(1))
+			})
+		})
+	})
+
 	Describe("taking out a lease on pipeline scheduling", func() {
 		Context("when it has been scheduled recently", func() {
 			It("does not get the lease", func() {
@@ -126,58 +154,168 @@ var _ = Describe("Leases", func() {
 		})
 	})
 
-	Describe("LeaseResourceCheckingForJob", func() {
-		BeforeEach(func() {
-			_, _, err := pipelineDB.GetResource("some-resource")
-			Expect(err).NotTo(HaveOccurred())
-		})
+	Describe("GetNextPendingBuild", func() {
+		Context("when a build is created and then the lease is acquired", func() {
+			BeforeEach(func() {
+				_, err := pipelineDB.CreateJobBuild("some-job")
+				Expect(err).NotTo(HaveOccurred())
 
-		Context("when there has been a check recently", func() {
-			It("gets the lease", func() {
-				lease, leased, err := pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Second)
+				_, leased, err := pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Minute)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(leased).To(BeTrue())
+			})
 
-				acquired, err := pipelineDB.LeaseResourceCheckingForJobAcquired("some-job")
+			It("returns the build while the lease is acquired", func() {
+				_, found, err := pipelineDB.GetNextPendingBuild("some-job")
 				Expect(err).NotTo(HaveOccurred())
-				Expect(acquired).To(BeTrue())
-
-				lease.Break()
-
-				acquired, err = pipelineDB.LeaseResourceCheckingForJobAcquired("some-job")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(acquired).To(BeFalse())
-
-				lease, leased, err = pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Second)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(leased).To(BeTrue())
-
-				lease.Break()
+				Expect(found).To(BeTrue())
 			})
 		})
 
-		Context("when there has not been a check recently", func() {
-			It("gets and keeps the lease and stops others from immediately getting it", func() {
-				lease, leased, err := pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Second)
+		Context("when the lease is acquired and then a build is created", func() {
+			var lease db.Lease
+			BeforeEach(func() {
+				var err error
+				var leased bool
+				lease, leased, err = pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Minute)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(leased).To(BeTrue())
 
-				Consistently(func() bool {
-					_, leased, err = pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Second)
-					Expect(err).NotTo(HaveOccurred())
+				_, err = pipelineDB.CreateJobBuild("some-job")
+				Expect(err).NotTo(HaveOccurred())
+			})
 
-					return leased
-				}, 1500*time.Millisecond, 100*time.Millisecond).Should(BeFalse())
+			It("returns the build only after the lease is broken", func() {
+				_, found, err := pipelineDB.GetNextPendingBuild("some-job")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeFalse())
 
 				lease.Break()
 
-				time.Sleep(time.Second)
+				_, found, err = pipelineDB.GetNextPendingBuild("some-job")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeTrue())
+			})
 
-				newLease, leased, err := pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Second)
+			It("still returns the build after the lease is broken and reacquired", func() {
+				lease.Break()
+
+				_, leased, err := pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Minute)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(leased).To(BeTrue())
 
-				newLease.Break()
+				_, found, err := pipelineDB.GetNextPendingBuild("some-job")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeTrue())
+			})
+
+			Context("when someone else attempts to acquire the lease", func() {
+				It("still doesn't return the build before the lease is broken", func() {
+					_, leased, err := pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Minute)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(leased).To(BeFalse())
+
+					_, found, err := pipelineDB.GetNextPendingBuild("some-job")
+					Expect(err).NotTo(HaveOccurred())
+					Expect(found).To(BeFalse())
+				})
+			})
+		})
+	})
+
+	Describe("EnsurePendingBuildExists", func() {
+		Context("when only a started build exists", func() {
+			BeforeEach(func() {
+				build1, err := pipelineDB.CreateJobBuild("some-job")
+				Expect(err).NotTo(HaveOccurred())
+
+				started, err := sqlDB.StartBuild(build1.ID, pipelineDB.GetPipelineID(), "some-engine", "some-metadata")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(started).To(BeTrue())
+			})
+
+			It("creates a build", func() {
+				err := pipelineDB.EnsurePendingBuildExists("some-job")
+				Expect(err).NotTo(HaveOccurred())
+
+				_, found, err := pipelineDB.GetNextPendingBuild("some-job")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeTrue())
+			})
+
+			It("doesn't create another build the second time it's called", func() {
+				err := pipelineDB.EnsurePendingBuildExists("some-job")
+				Expect(err).NotTo(HaveOccurred())
+
+				err = pipelineDB.EnsurePendingBuildExists("some-job")
+				Expect(err).NotTo(HaveOccurred())
+
+				build2, found, err := pipelineDB.GetNextPendingBuild("some-job")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeTrue())
+
+				started, err := sqlDB.StartBuild(build2.ID, pipelineDB.GetPipelineID(), "some-engine", "some-metadata")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(started).To(BeTrue())
+
+				_, found, err = pipelineDB.GetNextPendingBuild("some-job")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeFalse())
+			})
+		})
+
+		Context("when the lease is acquired and then a build is created", func() {
+			var lease db.Lease
+			BeforeEach(func() {
+				var err error
+				var leased bool
+				lease, leased, err = pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Minute)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(leased).To(BeTrue())
+
+				_, err = pipelineDB.CreateJobBuild("some-job")
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("doesn't create another build", func() {
+				err := pipelineDB.EnsurePendingBuildExists("some-job")
+				Expect(err).NotTo(HaveOccurred())
+
+				lease.Break()
+
+				build1, found, err := pipelineDB.GetNextPendingBuild("some-job")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeTrue())
+
+				started, err := sqlDB.StartBuild(build1.ID, pipelineDB.GetPipelineID(), "some-engine", "some-metadata")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(started).To(BeTrue())
+
+				_, found, err = pipelineDB.GetNextPendingBuild("some-job")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeFalse())
+			})
+		})
+
+		Context("when the lease is acquired and no pending build exists", func() {
+			var lease db.Lease
+			BeforeEach(func() {
+				var err error
+				var leased bool
+				lease, leased, err = pipelineDB.LeaseResourceCheckingForJob(logger, "some-job", 1*time.Minute)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(leased).To(BeTrue())
+			})
+
+			It("creates a build", func() {
+				err := pipelineDB.EnsurePendingBuildExists("some-job")
+				Expect(err).NotTo(HaveOccurred())
+
+				lease.Break()
+
+				_, found, err := pipelineDB.GetNextPendingBuild("some-job")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeTrue())
 			})
 		})
 	})

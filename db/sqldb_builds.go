@@ -373,14 +373,7 @@ func (db *SQLDB) CreateOneOffBuild() (Build, error) {
 		return Build{}, err
 	}
 
-	_, err = tx.Exec(fmt.Sprintf(`
-		CREATE SEQUENCE %s MINVALUE 0
-	`, buildEventSeq(build.ID)))
-	if err != nil {
-		return Build{}, err
-	}
-
-	err = db.buildPrepHelper.CreateBuildPreparation(tx, build.ID)
+	err = createBuildEventSeq(tx, build.ID)
 	if err != nil {
 		return Build{}, err
 	}
@@ -454,20 +447,20 @@ WHERE id = $1
 
 	configInputs := config.JobInputs(jobConfig)
 
-	buildInputs, err := pdb.GetIdealBuildInputs(jobName)
+	buildInputs, err := pdb.GetIndependentBuildInputs(jobName)
 	if err != nil {
 		return BuildPreparation{}, false, err
 	}
 
 	inputsSatisfied := BuildPreparationStatusBlocking
 	if len(buildInputs) == len(configInputs) {
-		compromiseBuildInputs, err := pdb.GetCompromiseBuildInputs(jobName)
+		nextBuildInputs, found, err := pdb.GetNextBuildInputs(jobName)
 		if err != nil {
 			return BuildPreparation{}, false, err
 		}
 
-		if len(compromiseBuildInputs) == len(configInputs) {
-			buildInputs = compromiseBuildInputs
+		if found {
+			buildInputs = nextBuildInputs
 			inputsSatisfied = BuildPreparationStatusNotBlocking
 		}
 	}
@@ -523,34 +516,11 @@ WHERE id = $1
 }
 
 func (db *SQLDB) UpdateBuildPreparation(buildPrep BuildPreparation) error {
-	tx, err := db.conn.Begin()
-	if err != nil {
-		return err
-	}
-
-	defer tx.Rollback()
-
-	err = db.buildPrepHelper.UpdateBuildPreparation(tx, buildPrep)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	return nil
 }
 
 func (db *SQLDB) ResetBuildPreparationsWithPipelinePaused(pipelineID int) error {
-	_, err := db.conn.Exec(`
-			UPDATE build_preparation
-			SET paused_pipeline='blocking',
-			    paused_job='unknown',
-					max_running_builds='unknown',
-					inputs='{}',
-					inputs_satisfied='unknown'
-			FROM build_preparation bp, builds b, jobs j
-			WHERE bp.build_id = b.id AND b.job_id = j.id
-				AND j.pipeline_id = $1 AND b.status = 'pending' AND b.scheduled = false
-		`, pipelineID)
-	return err
+	return nil
 }
 
 func (db *SQLDB) StartBuild(buildID int, pipelineID int, engine, metadata string) (bool, error) {

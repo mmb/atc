@@ -58,10 +58,10 @@ var _ = Describe("Image Versions", func() {
 	})
 
 	It("can retrieve saved image_resource_versions from the database", func() {
-		build, err := pipelineDB.CreateJobBuild("some-job", false)
+		build, err := pipelineDB.CreateJobBuild("some-job")
 		Expect(err).ToNot(HaveOccurred())
 
-		otherBuild, err := pipelineDB.CreateJobBuild("some-job", false)
+		otherBuild, err := pipelineDB.CreateJobBuild("some-job")
 		Expect(err).ToNot(HaveOccurred())
 
 		identifier := db.ResourceCacheIdentifier{

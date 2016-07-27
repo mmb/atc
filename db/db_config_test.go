@@ -547,7 +547,7 @@ var _ = Describe("Keeping track of pipeline configs", func() {
 		myPipelineDB, err := pipelineDBFactory.BuildWithTeamNameAndName(team.Name, "my-pipeline")
 		Expect(err).NotTo(HaveOccurred())
 
-		build, err := myPipelineDB.CreateJobBuild("some-job", false)
+		build, err := myPipelineDB.CreateJobBuild("some-job")
 		Expect(err).NotTo(HaveOccurred())
 
 		gottenConfig, _, err := database.GetConfigByBuildID(build.ID)
