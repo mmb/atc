@@ -15,7 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = FDescribe("I'm the BuildStarter", func() {
+var _ = Describe("I'm a BuildStarter", func() {
 	var (
 		fakeDB                 *buildstarterfakes.FakeBuildStarterDB
 		fakeBuildsDB           *buildstarterfakes.FakeBuildStarterBuildsDB
@@ -84,13 +84,15 @@ var _ = FDescribe("I'm the BuildStarter", func() {
 				})
 			})
 
-			Context("when there is one pending build", func() {
+			Context("when there is a pending build", func() {
 				var pendingBuild db.Build
+				var pendingBuildCount int
 
 				BeforeEach(func() {
 					pendingBuild = db.Build{ID: 47, PipelineID: 52}
+					pendingBuildCount = 1
 					fakeDB.GetNextPendingBuildStub = func(string) (db.Build, bool, error) {
-						if fakeDB.GetNextBuildInputsCallCount() == 0 {
+						if fakeDB.GetNextBuildInputsCallCount() < pendingBuildCount {
 							return pendingBuild, true, nil
 						}
 						return db.Build{}, false, nil
@@ -233,9 +235,115 @@ var _ = FDescribe("I'm the BuildStarter", func() {
 								It("starts the engine build (asynchronously)", func() {
 									Eventually(engineBuild.ResumeCallCount).Should(Equal(1))
 								})
+
+								Context("when there are 7 pending builds", func() {
+									BeforeEach(func() {
+										pendingBuildCount = 7
+									})
+
+									It("starts 7 engine builds (asynchronously)", func() {
+										Eventually(engineBuild.ResumeCallCount).Should(Equal(7))
+									})
+								})
 							})
 						})
 					})
+				})
+
+				itReturnsTheError := func() {
+					It("returns the error", func() {
+						Expect(tryStartErr).To(Equal(disaster))
+					})
+				}
+
+				itDoesntReturnAnErrorOrMarkTheBuildAsScheduled := func() {
+					It("doesn't return an error", func() {
+						Expect(tryStartErr).NotTo(HaveOccurred())
+					})
+
+					It("doesn't try to mark the build as scheduled", func() {
+						Expect(fakeDB.UpdateBuildToScheduledCallCount()).To(BeZero())
+					})
+				}
+
+				itUpdatedMaxInFlightForTheRightJob := func() {
+					It("updated max in flight for the right job", func() {
+						Expect(fakeMaxInFlightUpdater.UpdateMaxInFlightReachedCallCount()).To(Equal(1))
+						_, actualJobConfig, actualBuildID := fakeMaxInFlightUpdater.UpdateMaxInFlightReachedArgsForCall(0)
+						Expect(actualJobConfig).To(Equal(atc.JobConfig{Name: "some-job"}))
+						Expect(actualBuildID).To(Equal(pendingBuild.ID))
+					})
+				}
+
+				Context("when updating max in flight reached fails", func() {
+					BeforeEach(func() {
+						fakeMaxInFlightUpdater.UpdateMaxInFlightReachedReturns(false, disaster)
+					})
+
+					itReturnsTheError()
+					itUpdatedMaxInFlightForTheRightJob()
+				})
+
+				Context("when max in flight is reached", func() {
+					BeforeEach(func() {
+						fakeMaxInFlightUpdater.UpdateMaxInFlightReachedReturns(true, nil)
+					})
+
+					itDoesntReturnAnErrorOrMarkTheBuildAsScheduled()
+				})
+
+				Context("when getting the next build inputs fails", func() {
+					BeforeEach(func() {
+						fakeDB.GetNextBuildInputsReturns(nil, false, disaster)
+					})
+
+					itReturnsTheError()
+					itUpdatedMaxInFlightForTheRightJob()
+				})
+
+				Context("when there are no next build inputs", func() {
+					BeforeEach(func() {
+						fakeDB.GetNextBuildInputsReturns(nil, false, nil)
+					})
+
+					itDoesntReturnAnErrorOrMarkTheBuildAsScheduled()
+					itUpdatedMaxInFlightForTheRightJob()
+				})
+
+				Context("when checking if the pipeline is paused fails", func() {
+					BeforeEach(func() {
+						fakeDB.IsPausedReturns(false, disaster)
+					})
+
+					itReturnsTheError()
+					itUpdatedMaxInFlightForTheRightJob()
+				})
+
+				Context("when the pipeline is paused", func() {
+					BeforeEach(func() {
+						fakeDB.IsPausedReturns(true, nil)
+					})
+
+					itDoesntReturnAnErrorOrMarkTheBuildAsScheduled()
+					itUpdatedMaxInFlightForTheRightJob()
+				})
+
+				Context("when getting the job fails", func() {
+					BeforeEach(func() {
+						fakeDB.GetJobReturns(db.SavedJob{}, disaster)
+					})
+
+					itReturnsTheError()
+					itUpdatedMaxInFlightForTheRightJob()
+				})
+
+				Context("when the job is paused", func() {
+					BeforeEach(func() {
+						fakeDB.GetJobReturns(db.SavedJob{Paused: true}, nil)
+					})
+
+					itDoesntReturnAnErrorOrMarkTheBuildAsScheduled()
+					itUpdatedMaxInFlightForTheRightJob()
 				})
 			})
 		})
