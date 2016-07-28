@@ -9,7 +9,7 @@ import (
 	"github.com/pivotal-golang/lager"
 )
 
-type FakeMaxInFlightUpdater struct {
+type FakeUpdater struct {
 	UpdateMaxInFlightReachedStub        func(logger lager.Logger, jobConfig atc.JobConfig, buildID int) (bool, error)
 	updateMaxInFlightReachedMutex       sync.RWMutex
 	updateMaxInFlightReachedArgsForCall []struct {
@@ -25,7 +25,7 @@ type FakeMaxInFlightUpdater struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeMaxInFlightUpdater) UpdateMaxInFlightReached(logger lager.Logger, jobConfig atc.JobConfig, buildID int) (bool, error) {
+func (fake *FakeUpdater) UpdateMaxInFlightReached(logger lager.Logger, jobConfig atc.JobConfig, buildID int) (bool, error) {
 	fake.updateMaxInFlightReachedMutex.Lock()
 	fake.updateMaxInFlightReachedArgsForCall = append(fake.updateMaxInFlightReachedArgsForCall, struct {
 		logger    lager.Logger
@@ -41,19 +41,19 @@ func (fake *FakeMaxInFlightUpdater) UpdateMaxInFlightReached(logger lager.Logger
 	}
 }
 
-func (fake *FakeMaxInFlightUpdater) UpdateMaxInFlightReachedCallCount() int {
+func (fake *FakeUpdater) UpdateMaxInFlightReachedCallCount() int {
 	fake.updateMaxInFlightReachedMutex.RLock()
 	defer fake.updateMaxInFlightReachedMutex.RUnlock()
 	return len(fake.updateMaxInFlightReachedArgsForCall)
 }
 
-func (fake *FakeMaxInFlightUpdater) UpdateMaxInFlightReachedArgsForCall(i int) (lager.Logger, atc.JobConfig, int) {
+func (fake *FakeUpdater) UpdateMaxInFlightReachedArgsForCall(i int) (lager.Logger, atc.JobConfig, int) {
 	fake.updateMaxInFlightReachedMutex.RLock()
 	defer fake.updateMaxInFlightReachedMutex.RUnlock()
 	return fake.updateMaxInFlightReachedArgsForCall[i].logger, fake.updateMaxInFlightReachedArgsForCall[i].jobConfig, fake.updateMaxInFlightReachedArgsForCall[i].buildID
 }
 
-func (fake *FakeMaxInFlightUpdater) UpdateMaxInFlightReachedReturns(result1 bool, result2 error) {
+func (fake *FakeUpdater) UpdateMaxInFlightReachedReturns(result1 bool, result2 error) {
 	fake.UpdateMaxInFlightReachedStub = nil
 	fake.updateMaxInFlightReachedReturns = struct {
 		result1 bool
@@ -61,7 +61,7 @@ func (fake *FakeMaxInFlightUpdater) UpdateMaxInFlightReachedReturns(result1 bool
 	}{result1, result2}
 }
 
-func (fake *FakeMaxInFlightUpdater) Invocations() map[string][][]interface{} {
+func (fake *FakeUpdater) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
 	fake.updateMaxInFlightReachedMutex.RLock()
@@ -69,7 +69,7 @@ func (fake *FakeMaxInFlightUpdater) Invocations() map[string][][]interface{} {
 	return fake.invocations
 }
 
-func (fake *FakeMaxInFlightUpdater) recordInvocation(key string, args []interface{}) {
+func (fake *FakeUpdater) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
 	if fake.invocations == nil {
@@ -81,4 +81,4 @@ func (fake *FakeMaxInFlightUpdater) recordInvocation(key string, args []interfac
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-var _ maxinflight.MaxInFlightUpdater = new(FakeMaxInFlightUpdater)
+var _ maxinflight.Updater = new(FakeUpdater)

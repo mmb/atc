@@ -6,30 +6,45 @@ import (
 	"github.com/pivotal-golang/lager"
 )
 
-//go:generate counterfeiter . MaxInFlightUpdater
+//go:generate counterfeiter . Updater
 
-type MaxInFlightUpdater interface {
+type Updater interface {
 	UpdateMaxInFlightReached(logger lager.Logger, jobConfig atc.JobConfig, buildID int) (bool, error)
 }
 
-//go:generate counterfeiter . MaxInFlightUpdaterDB
+//go:generate counterfeiter . UpdaterDB
 
-type MaxInFlightUpdaterDB interface {
+type UpdaterDB interface {
 	GetRunningBuildsBySerialGroup(jobName string, serialGroups []string) ([]db.Build, error)
 	GetNextPendingBuildBySerialGroup(jobName string, serialGroups []string) (db.Build, bool, error)
 	SetMaxInFlightReached(jobName string, reached bool) error
 }
 
-func NewMaxInFlightUpdater(db MaxInFlightUpdaterDB) MaxInFlightUpdater {
-	return &maxInFlightUpdater{db: db}
+func NewUpdater(db UpdaterDB) Updater {
+	return &updater{db: db}
 }
 
-type maxInFlightUpdater struct {
-	db MaxInFlightUpdaterDB
+type updater struct {
+	db UpdaterDB
 }
 
-func (s *maxInFlightUpdater) UpdateMaxInFlightReached(logger lager.Logger, jobConfig atc.JobConfig, buildID int) (bool, error) {
+func (s *updater) UpdateMaxInFlightReached(logger lager.Logger, jobConfig atc.JobConfig, buildID int) (bool, error) {
 	logger = logger.Session("is-max-in-flight-reached")
+	reached, err := s.isMaxInFlightReached(logger, jobConfig, buildID)
+	if err != nil {
+		return false, err
+	}
+
+	err = s.db.SetMaxInFlightReached(jobConfig.Name, reached)
+	if err != nil {
+		logger.Error("failed-to-set-max-in-flight-reached", err)
+		return false, err
+	}
+
+	return reached, nil
+}
+
+func (s *updater) isMaxInFlightReached(logger lager.Logger, jobConfig atc.JobConfig, buildID int) (bool, error) {
 	maxInFlight := jobConfig.MaxInFlight()
 
 	if maxInFlight == 0 {

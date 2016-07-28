@@ -17,11 +17,11 @@ import (
 
 var _ = Describe("I'm a BuildStarter", func() {
 	var (
-		fakeDB                 *buildstarterfakes.FakeBuildStarterDB
-		fakeBuildsDB           *buildstarterfakes.FakeBuildStarterBuildsDB
-		fakeMaxInFlightUpdater *maxinflightfakes.FakeMaxInFlightUpdater
-		fakeFactory            *buildstarterfakes.FakeBuildFactory
-		fakeEngine             *enginefakes.FakeEngine
+		fakeDB       *buildstarterfakes.FakeBuildStarterDB
+		fakeBuildsDB *buildstarterfakes.FakeBuildStarterBuildsDB
+		fakeUpdater  *maxinflightfakes.FakeUpdater
+		fakeFactory  *buildstarterfakes.FakeBuildFactory
+		fakeEngine   *enginefakes.FakeEngine
 
 		buildStarter buildstarter.BuildStarter
 
@@ -31,11 +31,11 @@ var _ = Describe("I'm a BuildStarter", func() {
 	BeforeEach(func() {
 		fakeDB = new(buildstarterfakes.FakeBuildStarterDB)
 		fakeBuildsDB = new(buildstarterfakes.FakeBuildStarterBuildsDB)
-		fakeMaxInFlightUpdater = new(maxinflightfakes.FakeMaxInFlightUpdater)
+		fakeUpdater = new(maxinflightfakes.FakeUpdater)
 		fakeFactory = new(buildstarterfakes.FakeBuildFactory)
 		fakeEngine = new(enginefakes.FakeEngine)
 
-		buildStarter = buildstarter.NewBuildStarter(fakeDB, fakeBuildsDB, fakeMaxInFlightUpdater, fakeFactory, fakeEngine)
+		buildStarter = buildstarter.NewBuildStarter(fakeDB, fakeBuildsDB, fakeUpdater, fakeFactory, fakeEngine)
 
 		disaster = errors.New("bad thing")
 	})
@@ -53,7 +53,7 @@ var _ = Describe("I'm a BuildStarter", func() {
 
 		Context("when the stars align", func() {
 			BeforeEach(func() {
-				fakeMaxInFlightUpdater.UpdateMaxInFlightReachedReturns(false, nil)
+				fakeUpdater.UpdateMaxInFlightReachedReturns(false, nil)
 				fakeDB.GetNextBuildInputsReturns([]db.BuildInput{{Name: "some-input"}}, true, nil)
 				fakeDB.IsPausedReturns(false, nil)
 				fakeDB.GetJobReturns(db.SavedJob{Paused: false}, nil)
@@ -268,8 +268,8 @@ var _ = Describe("I'm a BuildStarter", func() {
 
 				itUpdatedMaxInFlightForTheRightJob := func() {
 					It("updated max in flight for the right job", func() {
-						Expect(fakeMaxInFlightUpdater.UpdateMaxInFlightReachedCallCount()).To(Equal(1))
-						_, actualJobConfig, actualBuildID := fakeMaxInFlightUpdater.UpdateMaxInFlightReachedArgsForCall(0)
+						Expect(fakeUpdater.UpdateMaxInFlightReachedCallCount()).To(Equal(1))
+						_, actualJobConfig, actualBuildID := fakeUpdater.UpdateMaxInFlightReachedArgsForCall(0)
 						Expect(actualJobConfig).To(Equal(atc.JobConfig{Name: "some-job"}))
 						Expect(actualBuildID).To(Equal(pendingBuild.ID))
 					})
@@ -277,7 +277,7 @@ var _ = Describe("I'm a BuildStarter", func() {
 
 				Context("when updating max in flight reached fails", func() {
 					BeforeEach(func() {
-						fakeMaxInFlightUpdater.UpdateMaxInFlightReachedReturns(false, disaster)
+						fakeUpdater.UpdateMaxInFlightReachedReturns(false, disaster)
 					})
 
 					itReturnsTheError()
@@ -286,7 +286,7 @@ var _ = Describe("I'm a BuildStarter", func() {
 
 				Context("when max in flight is reached", func() {
 					BeforeEach(func() {
-						fakeMaxInFlightUpdater.UpdateMaxInFlightReachedReturns(true, nil)
+						fakeUpdater.UpdateMaxInFlightReachedReturns(true, nil)
 					})
 
 					itDoesntReturnAnErrorOrMarkTheBuildAsScheduled()

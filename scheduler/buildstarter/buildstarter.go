@@ -45,7 +45,7 @@ type BuildFactory interface {
 func NewBuildStarter(
 	db BuildStarterDB,
 	buildsDB BuildStarterBuildsDB,
-	maxInFlightUpdater maxinflight.MaxInFlightUpdater,
+	maxInFlightUpdater maxinflight.Updater,
 	factory BuildFactory,
 	execEngine engine.Engine,
 ) BuildStarter {
@@ -61,7 +61,7 @@ func NewBuildStarter(
 type buildStarter struct {
 	db                 BuildStarterDB
 	buildsDB           BuildStarterBuildsDB
-	maxInFlightUpdater maxinflight.MaxInFlightUpdater
+	maxInFlightUpdater maxinflight.Updater
 	factory            BuildFactory
 	execEngine         engine.Engine
 }

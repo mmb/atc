@@ -8,7 +8,7 @@ import (
 	"github.com/concourse/atc/scheduler/buildstarter/maxinflight"
 )
 
-type FakeMaxInFlightUpdaterDB struct {
+type FakeUpdaterDB struct {
 	GetRunningBuildsBySerialGroupStub        func(jobName string, serialGroups []string) ([]db.Build, error)
 	getRunningBuildsBySerialGroupMutex       sync.RWMutex
 	getRunningBuildsBySerialGroupArgsForCall []struct {
@@ -43,7 +43,7 @@ type FakeMaxInFlightUpdaterDB struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) GetRunningBuildsBySerialGroup(jobName string, serialGroups []string) ([]db.Build, error) {
+func (fake *FakeUpdaterDB) GetRunningBuildsBySerialGroup(jobName string, serialGroups []string) ([]db.Build, error) {
 	var serialGroupsCopy []string
 	if serialGroups != nil {
 		serialGroupsCopy = make([]string, len(serialGroups))
@@ -63,19 +63,19 @@ func (fake *FakeMaxInFlightUpdaterDB) GetRunningBuildsBySerialGroup(jobName stri
 	}
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) GetRunningBuildsBySerialGroupCallCount() int {
+func (fake *FakeUpdaterDB) GetRunningBuildsBySerialGroupCallCount() int {
 	fake.getRunningBuildsBySerialGroupMutex.RLock()
 	defer fake.getRunningBuildsBySerialGroupMutex.RUnlock()
 	return len(fake.getRunningBuildsBySerialGroupArgsForCall)
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) GetRunningBuildsBySerialGroupArgsForCall(i int) (string, []string) {
+func (fake *FakeUpdaterDB) GetRunningBuildsBySerialGroupArgsForCall(i int) (string, []string) {
 	fake.getRunningBuildsBySerialGroupMutex.RLock()
 	defer fake.getRunningBuildsBySerialGroupMutex.RUnlock()
 	return fake.getRunningBuildsBySerialGroupArgsForCall[i].jobName, fake.getRunningBuildsBySerialGroupArgsForCall[i].serialGroups
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) GetRunningBuildsBySerialGroupReturns(result1 []db.Build, result2 error) {
+func (fake *FakeUpdaterDB) GetRunningBuildsBySerialGroupReturns(result1 []db.Build, result2 error) {
 	fake.GetRunningBuildsBySerialGroupStub = nil
 	fake.getRunningBuildsBySerialGroupReturns = struct {
 		result1 []db.Build
@@ -83,7 +83,7 @@ func (fake *FakeMaxInFlightUpdaterDB) GetRunningBuildsBySerialGroupReturns(resul
 	}{result1, result2}
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) GetNextPendingBuildBySerialGroup(jobName string, serialGroups []string) (db.Build, bool, error) {
+func (fake *FakeUpdaterDB) GetNextPendingBuildBySerialGroup(jobName string, serialGroups []string) (db.Build, bool, error) {
 	var serialGroupsCopy []string
 	if serialGroups != nil {
 		serialGroupsCopy = make([]string, len(serialGroups))
@@ -103,19 +103,19 @@ func (fake *FakeMaxInFlightUpdaterDB) GetNextPendingBuildBySerialGroup(jobName s
 	}
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) GetNextPendingBuildBySerialGroupCallCount() int {
+func (fake *FakeUpdaterDB) GetNextPendingBuildBySerialGroupCallCount() int {
 	fake.getNextPendingBuildBySerialGroupMutex.RLock()
 	defer fake.getNextPendingBuildBySerialGroupMutex.RUnlock()
 	return len(fake.getNextPendingBuildBySerialGroupArgsForCall)
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) GetNextPendingBuildBySerialGroupArgsForCall(i int) (string, []string) {
+func (fake *FakeUpdaterDB) GetNextPendingBuildBySerialGroupArgsForCall(i int) (string, []string) {
 	fake.getNextPendingBuildBySerialGroupMutex.RLock()
 	defer fake.getNextPendingBuildBySerialGroupMutex.RUnlock()
 	return fake.getNextPendingBuildBySerialGroupArgsForCall[i].jobName, fake.getNextPendingBuildBySerialGroupArgsForCall[i].serialGroups
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) GetNextPendingBuildBySerialGroupReturns(result1 db.Build, result2 bool, result3 error) {
+func (fake *FakeUpdaterDB) GetNextPendingBuildBySerialGroupReturns(result1 db.Build, result2 bool, result3 error) {
 	fake.GetNextPendingBuildBySerialGroupStub = nil
 	fake.getNextPendingBuildBySerialGroupReturns = struct {
 		result1 db.Build
@@ -124,7 +124,7 @@ func (fake *FakeMaxInFlightUpdaterDB) GetNextPendingBuildBySerialGroupReturns(re
 	}{result1, result2, result3}
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) SetMaxInFlightReached(jobName string, reached bool) error {
+func (fake *FakeUpdaterDB) SetMaxInFlightReached(jobName string, reached bool) error {
 	fake.setMaxInFlightReachedMutex.Lock()
 	fake.setMaxInFlightReachedArgsForCall = append(fake.setMaxInFlightReachedArgsForCall, struct {
 		jobName string
@@ -139,26 +139,26 @@ func (fake *FakeMaxInFlightUpdaterDB) SetMaxInFlightReached(jobName string, reac
 	}
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) SetMaxInFlightReachedCallCount() int {
+func (fake *FakeUpdaterDB) SetMaxInFlightReachedCallCount() int {
 	fake.setMaxInFlightReachedMutex.RLock()
 	defer fake.setMaxInFlightReachedMutex.RUnlock()
 	return len(fake.setMaxInFlightReachedArgsForCall)
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) SetMaxInFlightReachedArgsForCall(i int) (string, bool) {
+func (fake *FakeUpdaterDB) SetMaxInFlightReachedArgsForCall(i int) (string, bool) {
 	fake.setMaxInFlightReachedMutex.RLock()
 	defer fake.setMaxInFlightReachedMutex.RUnlock()
 	return fake.setMaxInFlightReachedArgsForCall[i].jobName, fake.setMaxInFlightReachedArgsForCall[i].reached
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) SetMaxInFlightReachedReturns(result1 error) {
+func (fake *FakeUpdaterDB) SetMaxInFlightReachedReturns(result1 error) {
 	fake.SetMaxInFlightReachedStub = nil
 	fake.setMaxInFlightReachedReturns = struct {
 		result1 error
 	}{result1}
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) Invocations() map[string][][]interface{} {
+func (fake *FakeUpdaterDB) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
 	fake.getRunningBuildsBySerialGroupMutex.RLock()
@@ -170,7 +170,7 @@ func (fake *FakeMaxInFlightUpdaterDB) Invocations() map[string][][]interface{} {
 	return fake.invocations
 }
 
-func (fake *FakeMaxInFlightUpdaterDB) recordInvocation(key string, args []interface{}) {
+func (fake *FakeUpdaterDB) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
 	if fake.invocations == nil {
@@ -182,4 +182,4 @@ func (fake *FakeMaxInFlightUpdaterDB) recordInvocation(key string, args []interf
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-var _ maxinflight.MaxInFlightUpdaterDB = new(FakeMaxInFlightUpdaterDB)
+var _ maxinflight.UpdaterDB = new(FakeUpdaterDB)
