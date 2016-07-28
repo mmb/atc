@@ -9,14 +9,16 @@ import (
 	"github.com/concourse/atc/db"
 	"github.com/concourse/atc/db/algorithm"
 	"github.com/concourse/atc/metric"
+	"github.com/concourse/atc/scheduler/buildstarter"
+	"github.com/concourse/atc/scheduler/inputmapper"
 	"github.com/pivotal-golang/lager"
 )
 
 type Scheduler struct {
 	DB           SchedulerDB
 	Scanner      Scanner
-	BuildStarter BuildStarter
-	InputMapper  InputMapper
+	BuildStarter buildstarter.BuildStarter
+	InputMapper  inputmapper.InputMapper
 }
 
 //go:generate counterfeiter . SchedulerDB

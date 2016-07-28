@@ -1,4 +1,4 @@
-package scheduler_test
+package inputmapper_test
 
 // import (
 // 	"github.com/concourse/atc"

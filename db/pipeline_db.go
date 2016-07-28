@@ -77,7 +77,6 @@ type PipelineDB interface {
 		independentMapping algorithm.InputMapping,
 	) (MissingInputReasons, error)
 	GetVersionedResourceByVersion(atcVersion atc.Version, resourceName string) (SavedVersionedResource, bool, error)
-	GetAlgorithmInputConfigs(db *algorithm.VersionsDB, jobName string, inputs []config.JobInput) (algorithm.InputConfigs, error)
 	SaveIndependentInputMapping(inputVersions algorithm.InputMapping, jobName string) error
 	GetIndependentBuildInputs(jobName string) ([]BuildInput, error)
 	SaveNextInputMapping(inputVersions algorithm.InputMapping, jobName string) error
@@ -1960,46 +1959,6 @@ func (pdb *pipelineDB) GetVersionedResourceByVersion(atcVersion atc.Version, res
 	}
 
 	return svr, true, nil
-}
-
-func (pdb *pipelineDB) GetAlgorithmInputConfigs(db *algorithm.VersionsDB, jobName string, inputs []config.JobInput) (algorithm.InputConfigs, error) {
-	inputConfigs := algorithm.InputConfigs{}
-
-	for _, input := range inputs {
-		if input.Version == nil {
-			input.Version = &atc.VersionConfig{Latest: true}
-		}
-
-		pinnedVersionID := 0
-		if input.Version.Pinned != nil {
-			savedVersion, found, err := pdb.GetVersionedResourceByVersion(input.Version.Pinned, input.Resource)
-			if err != nil {
-				return nil, err
-			}
-
-			if !found {
-				continue
-			}
-
-			pinnedVersionID = savedVersion.ID
-		}
-
-		jobs := algorithm.JobSet{}
-		for _, passedJobName := range input.Passed {
-			jobs[db.JobIDs[passedJobName]] = struct{}{}
-		}
-
-		inputConfigs = append(inputConfigs, algorithm.InputConfig{
-			Name:            input.Name,
-			UseEveryVersion: input.Version.Every,
-			PinnedVersionID: pinnedVersionID,
-			ResourceID:      db.ResourceIDs[input.Resource],
-			Passed:          jobs,
-			JobID:           db.JobIDs[jobName],
-		})
-	}
-
-	return inputConfigs, nil
 }
 
 func (pdb *pipelineDB) SaveIndependentInputMapping(inputVersions algorithm.InputMapping, jobName string) error {
