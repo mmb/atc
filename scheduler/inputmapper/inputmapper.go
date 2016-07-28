@@ -3,8 +3,8 @@ package inputmapper
 import (
 	"github.com/concourse/atc"
 	"github.com/concourse/atc/config"
-	"github.com/concourse/atc/db"
 	"github.com/concourse/atc/db/algorithm"
+	"github.com/concourse/atc/scheduler/inputmapper/inputconfig"
 	"github.com/pivotal-golang/lager"
 )
 
@@ -21,18 +21,18 @@ type InputMapper interface {
 //go:generate counterfeiter . InputMapperDB
 
 type InputMapperDB interface {
-	GetVersionedResourceByVersion(atcVersion atc.Version, resourceName string) (db.SavedVersionedResource, bool, error)
 	SaveIndependentInputMapping(inputVersions algorithm.InputMapping, jobName string) error
 	SaveNextInputMapping(inputVersions algorithm.InputMapping, jobName string) error
 	DeleteNextInputMapping(jobName string) error
 }
 
-func NewInputMapper(db InputMapperDB) InputMapper {
-	return &inputMapper{db: db}
+func NewInputMapper(db InputMapperDB, transformer inputconfig.Transformer) InputMapper {
+	return &inputMapper{db: db, transformer: transformer}
 }
 
 type inputMapper struct {
-	db InputMapperDB
+	db          InputMapperDB
+	transformer inputconfig.Transformer
 }
 
 func (i *inputMapper) SaveNextInputMapping(
@@ -44,7 +44,7 @@ func (i *inputMapper) SaveNextInputMapping(
 
 	inputConfigs := config.JobInputs(job)
 
-	algorithmInputConfigs, err := i.getAlgorithmInputConfigs(versions, job.Name, inputConfigs)
+	algorithmInputConfigs, err := i.transformer.TransformInputConfigs(versions, job.Name, inputConfigs)
 	if err != nil {
 		logger.Error("failed-to-get-algorithm-input-configs", err)
 		return nil, err
@@ -91,44 +91,4 @@ func (i *inputMapper) SaveNextInputMapping(
 	}
 
 	return resolvedMapping, nil
-}
-
-func (i *inputMapper) getAlgorithmInputConfigs(db *algorithm.VersionsDB, jobName string, inputs []config.JobInput) (algorithm.InputConfigs, error) {
-	inputConfigs := algorithm.InputConfigs{}
-
-	for _, input := range inputs {
-		if input.Version == nil {
-			input.Version = &atc.VersionConfig{Latest: true}
-		}
-
-		pinnedVersionID := 0
-		if input.Version.Pinned != nil {
-			savedVersion, found, err := i.db.GetVersionedResourceByVersion(input.Version.Pinned, input.Resource)
-			if err != nil {
-				return nil, err
-			}
-
-			if !found {
-				continue
-			}
-
-			pinnedVersionID = savedVersion.ID
-		}
-
-		jobs := algorithm.JobSet{}
-		for _, passedJobName := range input.Passed {
-			jobs[db.JobIDs[passedJobName]] = struct{}{}
-		}
-
-		inputConfigs = append(inputConfigs, algorithm.InputConfig{
-			Name:            input.Name,
-			UseEveryVersion: input.Version.Every,
-			PinnedVersionID: pinnedVersionID,
-			ResourceID:      db.ResourceIDs[input.Resource],
-			Passed:          jobs,
-			JobID:           db.JobIDs[jobName],
-		})
-	}
-
-	return inputConfigs, nil
 }

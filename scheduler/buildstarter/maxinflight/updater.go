@@ -28,14 +28,14 @@ type updater struct {
 	db UpdaterDB
 }
 
-func (s *updater) UpdateMaxInFlightReached(logger lager.Logger, jobConfig atc.JobConfig, buildID int) (bool, error) {
+func (u *updater) UpdateMaxInFlightReached(logger lager.Logger, jobConfig atc.JobConfig, buildID int) (bool, error) {
 	logger = logger.Session("is-max-in-flight-reached")
-	reached, err := s.isMaxInFlightReached(logger, jobConfig, buildID)
+	reached, err := u.isMaxInFlightReached(logger, jobConfig, buildID)
 	if err != nil {
 		return false, err
 	}
 
-	err = s.db.SetMaxInFlightReached(jobConfig.Name, reached)
+	err = u.db.SetMaxInFlightReached(jobConfig.Name, reached)
 	if err != nil {
 		logger.Error("failed-to-set-max-in-flight-reached", err)
 		return false, err
@@ -44,14 +44,14 @@ func (s *updater) UpdateMaxInFlightReached(logger lager.Logger, jobConfig atc.Jo
 	return reached, nil
 }
 
-func (s *updater) isMaxInFlightReached(logger lager.Logger, jobConfig atc.JobConfig, buildID int) (bool, error) {
+func (u *updater) isMaxInFlightReached(logger lager.Logger, jobConfig atc.JobConfig, buildID int) (bool, error) {
 	maxInFlight := jobConfig.MaxInFlight()
 
 	if maxInFlight == 0 {
 		return false, nil
 	}
 
-	builds, err := s.db.GetRunningBuildsBySerialGroup(jobConfig.Name, jobConfig.GetSerialGroups())
+	builds, err := u.db.GetRunningBuildsBySerialGroup(jobConfig.Name, jobConfig.GetSerialGroups())
 	if err != nil {
 		logger.Error("failed-to-get-running-builds-by-serial-group", err)
 		return false, err
@@ -61,7 +61,7 @@ func (s *updater) isMaxInFlightReached(logger lager.Logger, jobConfig atc.JobCon
 		return true, nil
 	}
 
-	nextMostPendingBuild, found, err := s.db.GetNextPendingBuildBySerialGroup(jobConfig.Name, jobConfig.GetSerialGroups())
+	nextMostPendingBuild, found, err := u.db.GetNextPendingBuildBySerialGroup(jobConfig.Name, jobConfig.GetSerialGroups())
 	if err != nil {
 		logger.Error("failed-to-get-next-pending-build-by-serial-group", err)
 		return false, err
