@@ -257,6 +257,15 @@ type FakePipelineDB struct {
 	unpauseJobReturns struct {
 		result1 error
 	}
+	SetMaxInFlightReachedStub        func(string, bool) error
+	setMaxInFlightReachedMutex       sync.RWMutex
+	setMaxInFlightReachedArgsForCall []struct {
+		arg1 string
+		arg2 bool
+	}
+	setMaxInFlightReachedReturns struct {
+		result1 error
+	}
 	UpdateFirstLoggedBuildIDStub        func(job string, newFirstLoggedBuildID int) error
 	updateFirstLoggedBuildIDMutex       sync.RWMutex
 	updateFirstLoggedBuildIDArgsForCall []struct {
@@ -395,6 +404,17 @@ type FakePipelineDB struct {
 	getMissingInputReasonsReturns struct {
 		result1 db.MissingInputReasons
 		result2 error
+	}
+	GetVersionedResourceByVersionStub        func(atcVersion atc.Version, resourceName string) (db.SavedVersionedResource, bool, error)
+	getVersionedResourceByVersionMutex       sync.RWMutex
+	getVersionedResourceByVersionArgsForCall []struct {
+		atcVersion   atc.Version
+		resourceName string
+	}
+	getVersionedResourceByVersionReturns struct {
+		result1 db.SavedVersionedResource
+		result2 bool
+		result3 error
 	}
 	GetAlgorithmInputConfigsStub        func(db *algorithm.VersionsDB, jobName string, inputs []config.JobInput) (algorithm.InputConfigs, error)
 	getAlgorithmInputConfigsMutex       sync.RWMutex
@@ -1473,6 +1493,40 @@ func (fake *FakePipelineDB) UnpauseJobReturns(result1 error) {
 	}{result1}
 }
 
+func (fake *FakePipelineDB) SetMaxInFlightReached(arg1 string, arg2 bool) error {
+	fake.setMaxInFlightReachedMutex.Lock()
+	fake.setMaxInFlightReachedArgsForCall = append(fake.setMaxInFlightReachedArgsForCall, struct {
+		arg1 string
+		arg2 bool
+	}{arg1, arg2})
+	fake.recordInvocation("SetMaxInFlightReached", []interface{}{arg1, arg2})
+	fake.setMaxInFlightReachedMutex.Unlock()
+	if fake.SetMaxInFlightReachedStub != nil {
+		return fake.SetMaxInFlightReachedStub(arg1, arg2)
+	} else {
+		return fake.setMaxInFlightReachedReturns.result1
+	}
+}
+
+func (fake *FakePipelineDB) SetMaxInFlightReachedCallCount() int {
+	fake.setMaxInFlightReachedMutex.RLock()
+	defer fake.setMaxInFlightReachedMutex.RUnlock()
+	return len(fake.setMaxInFlightReachedArgsForCall)
+}
+
+func (fake *FakePipelineDB) SetMaxInFlightReachedArgsForCall(i int) (string, bool) {
+	fake.setMaxInFlightReachedMutex.RLock()
+	defer fake.setMaxInFlightReachedMutex.RUnlock()
+	return fake.setMaxInFlightReachedArgsForCall[i].arg1, fake.setMaxInFlightReachedArgsForCall[i].arg2
+}
+
+func (fake *FakePipelineDB) SetMaxInFlightReachedReturns(result1 error) {
+	fake.SetMaxInFlightReachedStub = nil
+	fake.setMaxInFlightReachedReturns = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakePipelineDB) UpdateFirstLoggedBuildID(job string, newFirstLoggedBuildID int) error {
 	fake.updateFirstLoggedBuildIDMutex.Lock()
 	fake.updateFirstLoggedBuildIDArgsForCall = append(fake.updateFirstLoggedBuildIDArgsForCall, struct {
@@ -1969,6 +2023,42 @@ func (fake *FakePipelineDB) GetMissingInputReasonsReturns(result1 db.MissingInpu
 		result1 db.MissingInputReasons
 		result2 error
 	}{result1, result2}
+}
+
+func (fake *FakePipelineDB) GetVersionedResourceByVersion(atcVersion atc.Version, resourceName string) (db.SavedVersionedResource, bool, error) {
+	fake.getVersionedResourceByVersionMutex.Lock()
+	fake.getVersionedResourceByVersionArgsForCall = append(fake.getVersionedResourceByVersionArgsForCall, struct {
+		atcVersion   atc.Version
+		resourceName string
+	}{atcVersion, resourceName})
+	fake.recordInvocation("GetVersionedResourceByVersion", []interface{}{atcVersion, resourceName})
+	fake.getVersionedResourceByVersionMutex.Unlock()
+	if fake.GetVersionedResourceByVersionStub != nil {
+		return fake.GetVersionedResourceByVersionStub(atcVersion, resourceName)
+	} else {
+		return fake.getVersionedResourceByVersionReturns.result1, fake.getVersionedResourceByVersionReturns.result2, fake.getVersionedResourceByVersionReturns.result3
+	}
+}
+
+func (fake *FakePipelineDB) GetVersionedResourceByVersionCallCount() int {
+	fake.getVersionedResourceByVersionMutex.RLock()
+	defer fake.getVersionedResourceByVersionMutex.RUnlock()
+	return len(fake.getVersionedResourceByVersionArgsForCall)
+}
+
+func (fake *FakePipelineDB) GetVersionedResourceByVersionArgsForCall(i int) (atc.Version, string) {
+	fake.getVersionedResourceByVersionMutex.RLock()
+	defer fake.getVersionedResourceByVersionMutex.RUnlock()
+	return fake.getVersionedResourceByVersionArgsForCall[i].atcVersion, fake.getVersionedResourceByVersionArgsForCall[i].resourceName
+}
+
+func (fake *FakePipelineDB) GetVersionedResourceByVersionReturns(result1 db.SavedVersionedResource, result2 bool, result3 error) {
+	fake.GetVersionedResourceByVersionStub = nil
+	fake.getVersionedResourceByVersionReturns = struct {
+		result1 db.SavedVersionedResource
+		result2 bool
+		result3 error
+	}{result1, result2, result3}
 }
 
 func (fake *FakePipelineDB) GetAlgorithmInputConfigs(db *algorithm.VersionsDB, jobName string, inputs []config.JobInput) (algorithm.InputConfigs, error) {
@@ -2666,6 +2756,8 @@ func (fake *FakePipelineDB) Invocations() map[string][][]interface{} {
 	defer fake.pauseJobMutex.RUnlock()
 	fake.unpauseJobMutex.RLock()
 	defer fake.unpauseJobMutex.RUnlock()
+	fake.setMaxInFlightReachedMutex.RLock()
+	defer fake.setMaxInFlightReachedMutex.RUnlock()
 	fake.updateFirstLoggedBuildIDMutex.RLock()
 	defer fake.updateFirstLoggedBuildIDMutex.RUnlock()
 	fake.getJobFinishedAndNextBuildMutex.RLock()
@@ -2694,6 +2786,8 @@ func (fake *FakePipelineDB) Invocations() map[string][][]interface{} {
 	defer fake.getNextInputVersionsMutex.RUnlock()
 	fake.getMissingInputReasonsMutex.RLock()
 	defer fake.getMissingInputReasonsMutex.RUnlock()
+	fake.getVersionedResourceByVersionMutex.RLock()
+	defer fake.getVersionedResourceByVersionMutex.RUnlock()
 	fake.getAlgorithmInputConfigsMutex.RLock()
 	defer fake.getAlgorithmInputConfigsMutex.RUnlock()
 	fake.saveIndependentInputMappingMutex.RLock()

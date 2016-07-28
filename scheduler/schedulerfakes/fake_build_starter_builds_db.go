@@ -8,7 +8,7 @@ import (
 	"github.com/concourse/atc/scheduler"
 )
 
-type FakeSchedulerBuildsDB struct {
+type FakeBuildStarterBuildsDB struct {
 	FinishBuildStub        func(buildID int, pipelineID int, status db.Status) error
 	finishBuildMutex       sync.RWMutex
 	finishBuildArgsForCall []struct {
@@ -23,7 +23,7 @@ type FakeSchedulerBuildsDB struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeSchedulerBuildsDB) FinishBuild(buildID int, pipelineID int, status db.Status) error {
+func (fake *FakeBuildStarterBuildsDB) FinishBuild(buildID int, pipelineID int, status db.Status) error {
 	fake.finishBuildMutex.Lock()
 	fake.finishBuildArgsForCall = append(fake.finishBuildArgsForCall, struct {
 		buildID    int
@@ -39,26 +39,26 @@ func (fake *FakeSchedulerBuildsDB) FinishBuild(buildID int, pipelineID int, stat
 	}
 }
 
-func (fake *FakeSchedulerBuildsDB) FinishBuildCallCount() int {
+func (fake *FakeBuildStarterBuildsDB) FinishBuildCallCount() int {
 	fake.finishBuildMutex.RLock()
 	defer fake.finishBuildMutex.RUnlock()
 	return len(fake.finishBuildArgsForCall)
 }
 
-func (fake *FakeSchedulerBuildsDB) FinishBuildArgsForCall(i int) (int, int, db.Status) {
+func (fake *FakeBuildStarterBuildsDB) FinishBuildArgsForCall(i int) (int, int, db.Status) {
 	fake.finishBuildMutex.RLock()
 	defer fake.finishBuildMutex.RUnlock()
 	return fake.finishBuildArgsForCall[i].buildID, fake.finishBuildArgsForCall[i].pipelineID, fake.finishBuildArgsForCall[i].status
 }
 
-func (fake *FakeSchedulerBuildsDB) FinishBuildReturns(result1 error) {
+func (fake *FakeBuildStarterBuildsDB) FinishBuildReturns(result1 error) {
 	fake.FinishBuildStub = nil
 	fake.finishBuildReturns = struct {
 		result1 error
 	}{result1}
 }
 
-func (fake *FakeSchedulerBuildsDB) Invocations() map[string][][]interface{} {
+func (fake *FakeBuildStarterBuildsDB) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
 	fake.finishBuildMutex.RLock()
@@ -66,7 +66,7 @@ func (fake *FakeSchedulerBuildsDB) Invocations() map[string][][]interface{} {
 	return fake.invocations
 }
 
-func (fake *FakeSchedulerBuildsDB) recordInvocation(key string, args []interface{}) {
+func (fake *FakeBuildStarterBuildsDB) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
 	if fake.invocations == nil {
@@ -78,4 +78,4 @@ func (fake *FakeSchedulerBuildsDB) recordInvocation(key string, args []interface
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-var _ scheduler.SchedulerBuildsDB = new(FakeSchedulerBuildsDB)
+var _ scheduler.BuildStarterBuildsDB = new(FakeBuildStarterBuildsDB)

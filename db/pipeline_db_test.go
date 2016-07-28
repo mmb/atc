@@ -1010,6 +1010,99 @@ var _ = Describe("PipelineDB", func() {
 			})
 		})
 
+		Describe("GetVersionedResourceByVersion", func() {
+			var savedVersion2 db.SavedVersionedResource
+			BeforeEach(func() {
+				err := pipelineDB.SaveResourceVersions(
+					atc.ResourceConfig{
+						Name: "some-resource",
+						Type: "some-type",
+						Source: atc.Source{
+							"source-config": "some-value",
+						},
+					},
+					[]atc.Version{
+						{"version": "v1"},
+						{"version": "v2"},
+						{"version": "v3"}, // disabled
+					},
+				)
+				Expect(err).NotTo(HaveOccurred())
+
+				// save metadata for v2
+				build, err := pipelineDB.CreateJobBuild("some-job")
+				Expect(err).ToNot(HaveOccurred())
+				_, err = pipelineDB.SaveBuildInput(build.ID, db.BuildInput{
+					Name: "some-input",
+					VersionedResource: db.VersionedResource{
+						Resource:   "some-resource",
+						Type:       "some-type",
+						Version:    db.Version{"version": "v2"},
+						Metadata:   []db.MetadataField{{Name: "name1", Value: "value1"}},
+						PipelineID: pipelineDB.GetPipelineID(),
+					},
+					FirstOccurrence: true,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				savedVersions, _, found, err := pipelineDB.GetResourceVersions("some-resource", db.Page{Limit: 2})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeTrue())
+				Expect(savedVersions).To(HaveLen(2))
+				pipelineDB.DisableVersionedResource(savedVersions[0].ID)
+				savedVersion2 = savedVersions[1]
+
+				err = pipelineDB.SaveResourceVersions(
+					atc.ResourceConfig{
+						Name: "some-other-resource",
+						Type: "some-type",
+						Source: atc.Source{
+							"source-config": "some-value",
+						},
+					},
+					[]atc.Version{
+						{"version": "v2"},
+					},
+				)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("returns the SavedVersionedResource matching the given resource name and atc version", func() {
+				By("returning versions that exist")
+				actualSavedVersion, found, err := pipelineDB.GetVersionedResourceByVersion(
+					atc.Version{"version": "v2"},
+					"some-resource",
+				)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeTrue())
+				Expect(actualSavedVersion).To(Equal(savedVersion2))
+
+				By("returning not found for versions that don't exist")
+				_, found, err = pipelineDB.GetVersionedResourceByVersion(
+					atc.Version{"versioni": "v2"},
+					"some-resource",
+				)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeFalse())
+
+				By("returning not found for versions that only exist in another resource")
+				_, found, err = pipelineDB.GetVersionedResourceByVersion(
+					atc.Version{"version": "v1"},
+					"some-other-resource",
+				)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeFalse())
+
+				By("returning not found for disabled versions")
+				_, found, err = pipelineDB.GetVersionedResourceByVersion(
+					atc.Version{"version": "v3"},
+					"some-resource",
+				)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeFalse())
+			})
+		})
+
 		It("can load up the latest enabled versioned resource", func() {
 			By("initially having no latest versioned resource")
 			_, found, err := pipelineDB.GetLatestEnabledVersionedResource(resource.Name)

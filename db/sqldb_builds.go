@@ -387,42 +387,82 @@ func (db *SQLDB) CreateOneOffBuild() (Build, error) {
 }
 
 func (db *SQLDB) GetBuildPreparation(passedBuildID int) (BuildPreparation, bool, error) {
-	var jobID int
+	var jobID sql.NullInt64
 	err := db.conn.QueryRow(`
 SELECT job_id
 FROM builds
-WHERE id = $1
+WHERE id = $1 AND status = 'pending'
 		`, passedBuildID).Scan(&jobID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return BuildPreparation{}, false, nil
+		}
+
 		return BuildPreparation{}, false, err
 	}
-	if jobID == 0 {
-		return BuildPreparation{}, true, nil
+
+	if !jobID.Valid {
+		return BuildPreparation{
+			BuildID:             passedBuildID,
+			PausedPipeline:      BuildPreparationStatusNotBlocking,
+			PausedJob:           BuildPreparationStatusNotBlocking,
+			MaxRunningBuilds:    BuildPreparationStatusNotBlocking,
+			Inputs:              map[string]BuildPreparationStatus{},
+			InputsSatisfied:     BuildPreparationStatusNotBlocking,
+			MissingInputReasons: MissingInputReasons{},
+		}, true, nil
 	}
 
 	var (
-		pausedPipeline       bool
-		pausedJob            bool
-		tooManyBuildsRunning bool
-		pipelineID           int
-		jobName              string
+		pausedPipeline         bool
+		pausedJob              bool
+		maxInFlightReached     bool
+		pipelineID             int
+		resourceCheckIsRunning bool
+		jobName                string
 	)
 	err = db.conn.QueryRow(`
-			SELECT p.paused, j.paused, bp.max_running_builds, j.pipeline_id, j.name
+			SELECT p.paused, j.paused, j.max_in_flight_reached, j.pipeline_id, j.name,
+				j.resource_check_finished_at > now() AND j.resource_check_waiver_end < $1
 			FROM builds b
 			JOIN jobs j
 				ON b.job_id = j.id
 			JOIN pipelines p
 				ON j.pipeline_id = p.id
-			JOIN build_preparation bp
-				ON bp.build_id = b.id
 			WHERE b.id = $1
-		`, passedBuildID).Scan(&pausedPipeline, &pausedJob, &tooManyBuildsRunning, &pipelineID, &jobName)
+		`, passedBuildID).Scan(&pausedPipeline, &pausedJob, &maxInFlightReached, &pipelineID, &jobName, &resourceCheckIsRunning)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return BuildPreparation{}, false, nil
 		}
 		return BuildPreparation{}, false, err
+	}
+
+	pausedPipelineStatus := BuildPreparationStatusNotBlocking
+	if pausedPipeline {
+		pausedPipelineStatus = BuildPreparationStatusBlocking
+	}
+
+	pausedJobStatus := BuildPreparationStatusNotBlocking
+	if pausedJob {
+		pausedJobStatus = BuildPreparationStatusBlocking
+	}
+
+	maxInFlightReachedStatus := BuildPreparationStatusNotBlocking
+	if maxInFlightReached {
+		maxInFlightReachedStatus = BuildPreparationStatusBlocking
+	}
+
+	if resourceCheckIsRunning {
+		return BuildPreparation{
+			BuildID:             passedBuildID,
+			PausedPipeline:      pausedPipelineStatus,
+			PausedJob:           pausedJobStatus,
+			MaxRunningBuilds:    maxInFlightReachedStatus,
+			Inputs:              map[string]BuildPreparationStatus{},
+			InputsSatisfied:     BuildPreparationStatusUnknown,
+			MissingInputReasons: MissingInputReasons{},
+		}, true, nil
 	}
 
 	pdbf := NewPipelineDBFactory(db.conn, db.bus, db)
@@ -447,68 +487,78 @@ WHERE id = $1
 
 	configInputs := config.JobInputs(jobConfig)
 
-	buildInputs, err := pdb.GetIndependentBuildInputs(jobName)
-	if err != nil {
-		return BuildPreparation{}, false, err
-	}
+	nextBuildInputs, found, err := pdb.GetNextBuildInputs(jobName)
 
-	inputsSatisfied := BuildPreparationStatusBlocking
-	if len(buildInputs) == len(configInputs) {
-		nextBuildInputs, found, err := pdb.GetNextBuildInputs(jobName)
+	inputsSatisfiedStatus := BuildPreparationStatusBlocking
+	inputs := map[string]BuildPreparationStatus{}
+	missingInputReasons := MissingInputReasons{}
+
+	if found {
+		inputsSatisfiedStatus = BuildPreparationStatusNotBlocking
+		for _, buildInput := range nextBuildInputs {
+			inputs[buildInput.Name] = BuildPreparationStatusNotBlocking
+		}
+	} else {
+		buildInputs, err := pdb.GetIndependentBuildInputs(jobName)
 		if err != nil {
 			return BuildPreparation{}, false, err
 		}
 
-		if found {
-			buildInputs = nextBuildInputs
-			inputsSatisfied = BuildPreparationStatusNotBlocking
-		}
-	}
-
-	inputs := map[string]BuildPreparationStatus{}
-	missingInputReasons := MissingInputReasons{}
-	for _, configInput := range configInputs {
-		found := false
-		for _, buildInput := range buildInputs {
-			if buildInput.Name == configInput.Name {
-				found = true
-				break
+		for _, configInput := range configInputs {
+			found := false
+			for _, buildInput := range buildInputs {
+				if buildInput.Name == configInput.Name {
+					found = true
+					break
+				}
 			}
-		}
-		if found {
-			inputs[configInput.Name] = BuildPreparationStatusNotBlocking
-		} else {
-			inputs[configInput.Name] = BuildPreparationStatusBlocking
-			if len(configInput.Passed) > 0 {
-				missingInputReasons.RegisterPassedConstraint(configInput.Name)
+			if found {
+				inputs[configInput.Name] = BuildPreparationStatusNotBlocking
 			} else {
-				missingInputReasons.RegisterNoVersions(configInput.Name)
+				inputs[configInput.Name] = BuildPreparationStatusBlocking
+				if len(configInput.Passed) > 0 {
+					if configInput.Version != nil && configInput.Version.Pinned != nil {
+						_, found, err := pdb.GetVersionedResourceByVersion(configInput.Version.Pinned, configInput.Resource)
+						if err != nil {
+							return BuildPreparation{}, false, err
+						}
+
+						if found {
+							missingInputReasons.RegisterPassedConstraint(configInput.Name)
+						} else {
+							versionJSON, err := json.Marshal(configInput.Version.Pinned)
+							if err != nil {
+								return BuildPreparation{}, false, err
+							}
+
+							missingInputReasons.RegisterPinnedVersionUnavailable(configInput.Name, string(versionJSON))
+						}
+					} else {
+						missingInputReasons.RegisterPassedConstraint(configInput.Name)
+					}
+				} else {
+					if configInput.Version != nil && configInput.Version.Pinned != nil {
+						versionJSON, err := json.Marshal(configInput.Version.Pinned)
+						if err != nil {
+							return BuildPreparation{}, false, err
+						}
+
+						missingInputReasons.RegisterPinnedVersionUnavailable(configInput.Name, string(versionJSON))
+					} else {
+						missingInputReasons.RegisterNoVersions(configInput.Name)
+					}
+				}
 			}
 		}
-	}
-
-	pausedPipelineStatus := BuildPreparationStatusNotBlocking
-	if pausedPipeline {
-		pausedPipelineStatus = BuildPreparationStatusBlocking
-	}
-
-	pausedJobStatus := BuildPreparationStatusNotBlocking
-	if pausedJob {
-		pausedJobStatus = BuildPreparationStatusBlocking
-	}
-
-	tooManyBuildsRunningStatus := BuildPreparationStatusNotBlocking
-	if tooManyBuildsRunning {
-		tooManyBuildsRunningStatus = BuildPreparationStatusBlocking
 	}
 
 	buildPreparation := BuildPreparation{
 		BuildID:             passedBuildID,
 		PausedPipeline:      pausedPipelineStatus,
 		PausedJob:           pausedJobStatus,
-		MaxRunningBuilds:    tooManyBuildsRunningStatus,
+		MaxRunningBuilds:    maxInFlightReachedStatus,
 		Inputs:              inputs,
-		InputsSatisfied:     inputsSatisfied,
+		InputsSatisfied:     inputsSatisfiedStatus,
 		MissingInputReasons: missingInputReasons,
 	}
 

@@ -53,6 +53,7 @@ type PipelineDB interface {
 	GetJob(job string) (SavedJob, error)
 	PauseJob(job string) error
 	UnpauseJob(job string) error
+	SetMaxInFlightReached(string, bool) error
 	UpdateFirstLoggedBuildID(job string, newFirstLoggedBuildID int) error
 
 	GetJobFinishedAndNextBuild(job string) (*Build, *Build, error)
@@ -75,6 +76,7 @@ type PipelineDB interface {
 		inputs []config.JobInput,
 		independentMapping algorithm.InputMapping,
 	) (MissingInputReasons, error)
+	GetVersionedResourceByVersion(atcVersion atc.Version, resourceName string) (SavedVersionedResource, bool, error)
 	GetAlgorithmInputConfigs(db *algorithm.VersionsDB, jobName string, inputs []config.JobInput) (algorithm.InputConfigs, error)
 	SaveIndependentInputMapping(inputVersions algorithm.InputMapping, jobName string) error
 	GetIndependentBuildInputs(jobName string) ([]BuildInput, error)
@@ -1915,6 +1917,51 @@ func (pdb *pipelineDB) GetNextInputVersions(versions *algorithm.VersionsDB, job 
 	return nil, false, nil, nil
 }
 
+func (pdb *pipelineDB) GetVersionedResourceByVersion(atcVersion atc.Version, resourceName string) (SavedVersionedResource, bool, error) {
+	var versionBytes, metadataBytes string
+
+	versionJSON, err := json.Marshal(atcVersion)
+	if err != nil {
+		return SavedVersionedResource{}, false, err
+	}
+
+	svr := SavedVersionedResource{
+		VersionedResource: VersionedResource{
+			Resource:   resourceName,
+			PipelineID: pdb.GetPipelineID(),
+		},
+	}
+
+	err = pdb.conn.QueryRow(`
+		SELECT v.id, v.enabled, v.type, v.version, v.metadata, v.check_order
+		FROM versioned_resources v
+		JOIN resources r ON r.id = v.resource_id
+		WHERE v.version = $1
+			AND r.name = $2
+			AND r.pipeline_id = $3
+			AND enabled = true
+	`, string(versionJSON), resourceName, pdb.ID).Scan(&svr.ID, &svr.Enabled, &svr.Type, &versionBytes, &metadataBytes, &svr.CheckOrder)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return SavedVersionedResource{}, false, nil
+		}
+
+		return SavedVersionedResource{}, false, err
+	}
+
+	err = json.Unmarshal([]byte(versionBytes), &svr.Version)
+	if err != nil {
+		return SavedVersionedResource{}, false, err
+	}
+
+	err = json.Unmarshal([]byte(metadataBytes), &svr.Metadata)
+	if err != nil {
+		return SavedVersionedResource{}, false, err
+	}
+
+	return svr, true, nil
+}
+
 func (pdb *pipelineDB) GetAlgorithmInputConfigs(db *algorithm.VersionsDB, jobName string, inputs []config.JobInput) (algorithm.InputConfigs, error) {
 	inputConfigs := algorithm.InputConfigs{}
 
@@ -1923,26 +1970,18 @@ func (pdb *pipelineDB) GetAlgorithmInputConfigs(db *algorithm.VersionsDB, jobNam
 			input.Version = &atc.VersionConfig{Latest: true}
 		}
 
-		resourceID := db.ResourceIDs[input.Resource]
-
 		pinnedVersionID := 0
 		if input.Version.Pinned != nil {
-			versionJSON, err := json.Marshal(input.Version.Pinned)
+			savedVersion, found, err := pdb.GetVersionedResourceByVersion(input.Version.Pinned, input.Resource)
 			if err != nil {
 				return nil, err
 			}
 
-			err = pdb.conn.QueryRow(`
-				SELECT id
-				  FROM versioned_resources
-				 WHERE version = $1 AND resource_id = $2
-			`, string(versionJSON), resourceID).Scan(&pinnedVersionID)
-			if err != nil {
-				if err == sql.ErrNoRows {
-					continue
-				}
-				return nil, err
+			if !found {
+				continue
 			}
+
+			pinnedVersionID = savedVersion.ID
 		}
 
 		jobs := algorithm.JobSet{}
@@ -1954,7 +1993,7 @@ func (pdb *pipelineDB) GetAlgorithmInputConfigs(db *algorithm.VersionsDB, jobNam
 			Name:            input.Name,
 			UseEveryVersion: input.Version.Every,
 			PinnedVersionID: pinnedVersionID,
-			ResourceID:      resourceID,
+			ResourceID:      db.ResourceIDs[input.Resource],
 			Passed:          jobs,
 			JobID:           db.JobIDs[jobName],
 		})
@@ -2137,6 +2176,28 @@ func (pdb *pipelineDB) PauseJob(job string) error {
 
 func (pdb *pipelineDB) UnpauseJob(job string) error {
 	return pdb.updatePausedJob(job, false)
+}
+
+func (pdb *pipelineDB) SetMaxInFlightReached(jobName string, reached bool) error {
+	result, err := pdb.conn.Exec(`
+		UPDATE jobs
+		SET max_in_flight_reached = $1
+		WHERE name = $2 AND pipeline_id = $3
+	`, reached, jobName, pdb.ID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected != 1 {
+		return nonOneRowAffectedError{rowsAffected}
+	}
+
+	return nil
 }
 
 func (pdb *pipelineDB) UpdateFirstLoggedBuildID(job string, newFirstLoggedBuildID int) error {
