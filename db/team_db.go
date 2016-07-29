@@ -39,9 +39,8 @@ type TeamDB interface {
 type teamDB struct {
 	teamName string
 
-	buildPrepHelper buildPreparationHelper
-	conn            Conn
-	buildFactory    *buildFactory
+	conn         Conn
+	buildFactory *buildFactory
 }
 
 func (db *teamDB) GetPipelineByName(pipelineName string) (SavedPipeline, error) {
@@ -561,14 +560,7 @@ func (db *teamDB) CreateOneOffBuild() (Build, error) {
 		return nil, err
 	}
 
-	_, err = tx.Exec(fmt.Sprintf(`
-		CREATE SEQUENCE %s MINVALUE 0
-	`, buildEventSeq(build.ID())))
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.buildPrepHelper.CreateBuildPreparation(tx, build.ID())
+	err = createBuildEventSeq(tx, build.ID())
 	if err != nil {
 		return nil, err
 	}

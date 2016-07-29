@@ -179,17 +179,6 @@ type FakeBuild struct {
 		result1 db.Notifier
 		result2 error
 	}
-	LeaseSchedulingStub        func(logger lager.Logger, interval time.Duration) (db.Lease, bool, error)
-	leaseSchedulingMutex       sync.RWMutex
-	leaseSchedulingArgsForCall []struct {
-		logger   lager.Logger
-		interval time.Duration
-	}
-	leaseSchedulingReturns struct {
-		result1 db.Lease
-		result2 bool
-		result3 error
-	}
 	LeaseTrackingStub        func(logger lager.Logger, interval time.Duration) (db.Lease, bool, error)
 	leaseTrackingMutex       sync.RWMutex
 	leaseTrackingArgsForCall []struct {
@@ -944,42 +933,6 @@ func (fake *FakeBuild) AbortNotifierReturns(result1 db.Notifier, result2 error) 
 	}{result1, result2}
 }
 
-func (fake *FakeBuild) LeaseScheduling(logger lager.Logger, interval time.Duration) (db.Lease, bool, error) {
-	fake.leaseSchedulingMutex.Lock()
-	fake.leaseSchedulingArgsForCall = append(fake.leaseSchedulingArgsForCall, struct {
-		logger   lager.Logger
-		interval time.Duration
-	}{logger, interval})
-	fake.recordInvocation("LeaseScheduling", []interface{}{logger, interval})
-	fake.leaseSchedulingMutex.Unlock()
-	if fake.LeaseSchedulingStub != nil {
-		return fake.LeaseSchedulingStub(logger, interval)
-	} else {
-		return fake.leaseSchedulingReturns.result1, fake.leaseSchedulingReturns.result2, fake.leaseSchedulingReturns.result3
-	}
-}
-
-func (fake *FakeBuild) LeaseSchedulingCallCount() int {
-	fake.leaseSchedulingMutex.RLock()
-	defer fake.leaseSchedulingMutex.RUnlock()
-	return len(fake.leaseSchedulingArgsForCall)
-}
-
-func (fake *FakeBuild) LeaseSchedulingArgsForCall(i int) (lager.Logger, time.Duration) {
-	fake.leaseSchedulingMutex.RLock()
-	defer fake.leaseSchedulingMutex.RUnlock()
-	return fake.leaseSchedulingArgsForCall[i].logger, fake.leaseSchedulingArgsForCall[i].interval
-}
-
-func (fake *FakeBuild) LeaseSchedulingReturns(result1 db.Lease, result2 bool, result3 error) {
-	fake.LeaseSchedulingStub = nil
-	fake.leaseSchedulingReturns = struct {
-		result1 db.Lease
-		result2 bool
-		result3 error
-	}{result1, result2, result3}
-}
-
 func (fake *FakeBuild) LeaseTracking(logger lager.Logger, interval time.Duration) (db.Lease, bool, error) {
 	fake.leaseTrackingMutex.Lock()
 	fake.leaseTrackingArgsForCall = append(fake.leaseTrackingArgsForCall, struct {
@@ -1311,8 +1264,6 @@ func (fake *FakeBuild) Invocations() map[string][][]interface{} {
 	defer fake.abortMutex.RUnlock()
 	fake.abortNotifierMutex.RLock()
 	defer fake.abortNotifierMutex.RUnlock()
-	fake.leaseSchedulingMutex.RLock()
-	defer fake.leaseSchedulingMutex.RUnlock()
 	fake.leaseTrackingMutex.RLock()
 	defer fake.leaseTrackingMutex.RUnlock()
 	fake.getPreparationMutex.RLock()
