@@ -14,6 +14,8 @@ import (
 	"github.com/pivotal-golang/lager"
 )
 
+const ResourceCheckingForJobTimeout = 5 * time.Minute
+
 type Scheduler struct {
 	DB           SchedulerDB
 	Scanner      Scanner
@@ -96,7 +98,7 @@ func (s *Scheduler) Schedule(logger lager.Logger, interval time.Duration) error 
 			PipelineName: s.DB.GetPipelineName(),
 			JobName:      job.Name,
 			Duration:     time.Since(jStart),
-		}.Emit(sLog)
+		}.Emit(sLog) // TODO: will this defer do the right thing?
 
 		inputMapping, err := s.InputMapper.SaveNextInputMapping(logger, versions, job)
 		if err != nil {
@@ -118,10 +120,10 @@ func (s *Scheduler) Schedule(logger lager.Logger, interval time.Duration) error 
 			}
 		}
 
-		// s.TryStartAllPendingBuilds(logger, job, pipelineConfig.Resources, pipelineConfig.ResourceTypes)
-		// if err != nil {
-		// 	return err
-		// }
+		s.BuildStarter.TryStartAllPendingBuilds(logger, job, pipelineConfig.Resources, pipelineConfig.ResourceTypes)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -139,7 +141,11 @@ func (s *Scheduler) TriggerImmediately(
 ) (db.Build, Waiter, error) {
 	logger = logger.Session("trigger-immediately", lager.Data{"job_name": jobConfig.Name})
 
-	lease, leased, err := s.DB.LeaseResourceCheckingForJob(logger, jobConfig.Name, 5*time.Minute)
+	lease, leased, err := s.DB.LeaseResourceCheckingForJob(
+		logger,
+		jobConfig.Name,
+		ResourceCheckingForJobTimeout,
+	)
 	if err != nil {
 		logger.Error("failed-to-lease-resource-checking-job", err)
 		return db.Build{}, nil, err
@@ -159,38 +165,38 @@ func (s *Scheduler) TriggerImmediately(
 
 	go func() {
 		defer wg.Done()
-		//
-		// 	if leased {
-		// 		defer lease.Break()
-		//
-		// 		jobBuildInputs := config.JobInputs(jobConfig)
-		// 		for _, input := range jobBuildInputs {
-		// 			scanLog := logger.Session("scan", lager.Data{
-		// 				"input":    input.Name,
-		// 				"resource": input.Resource,
-		// 			})
-		//
-		// 			err := s.Scanner.Scan(scanLog, input.Resource)
-		// 			if err != nil {
-		// 				return
-		// 			}
-		// 		}
-		//
-		// 		versions, err := s.DB.LoadVersionsDB()
-		// 		if err != nil {
-		// 			logger.Error("failed-to-load-versions-db", err)
-		// 			return
-		// 		}
-		//
-		// 		_, err = s.saveNextInputMapping(logger, versions, jobConfig)
-		// 		if err != nil {
-		// 			return
-		// 		}
-		//
-		// 		lease.Break()
-		// 	}
-		//
-		// err = s.TryStartAllPendingBuilds(logger, jobConfig, resourceConfigs, resourceTypes)
+
+		if leased {
+			defer lease.Break()
+
+			jobBuildInputs := config.JobInputs(jobConfig)
+			for _, input := range jobBuildInputs {
+				scanLog := logger.Session("scan", lager.Data{
+					"input":    input.Name,
+					"resource": input.Resource,
+				})
+
+				err := s.Scanner.Scan(scanLog, input.Resource)
+				if err != nil {
+					return
+				}
+			}
+
+			versions, err := s.DB.LoadVersionsDB()
+			if err != nil {
+				logger.Error("failed-to-load-versions-db", err)
+				return
+			}
+
+			_, err = s.InputMapper.SaveNextInputMapping(logger, versions, jobConfig)
+			if err != nil {
+				return
+			}
+
+			lease.Break()
+		}
+
+		err = s.BuildStarter.TryStartAllPendingBuilds(logger, jobConfig, resourceConfigs, resourceTypes)
 	}()
 
 	return build, wg, nil
