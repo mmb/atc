@@ -26,10 +26,10 @@ func (configs InputConfigs) Resolve(db *VersionsDB) (InputMapping, bool) {
 	for _, inputConfig := range configs {
 		versionCandidates := VersionCandidates{}
 
-		if len(inputConfig.Passed) == 0 { // TODO: delete unnecessary edge case?
+		if len(inputConfig.Passed) == 0 {
 			versionCandidates = db.AllVersionsForResource(inputConfig.ResourceID)
 
-			if len(versionCandidates) == 0 { // TODO: delete unnecessary edge case?
+			if len(versionCandidates) == 0 {
 				return nil, false
 			}
 		} else {
@@ -40,7 +40,7 @@ func (configs InputConfigs) Resolve(db *VersionsDB) (InputMapping, bool) {
 				inputConfig.Passed,
 			)
 
-			if len(versionCandidates) == 0 { // TODO: delete unnecessary edge case?
+			if len(versionCandidates) == 0 {
 				return nil, false
 			}
 		}
