@@ -4,24 +4,11 @@ package inputmapperfakes
 import (
 	"sync"
 
-	"github.com/concourse/atc"
-	"github.com/concourse/atc/db"
 	"github.com/concourse/atc/db/algorithm"
 	"github.com/concourse/atc/scheduler/inputmapper"
 )
 
 type FakeInputMapperDB struct {
-	GetVersionedResourceByVersionStub        func(atcVersion atc.Version, resourceName string) (db.SavedVersionedResource, bool, error)
-	getVersionedResourceByVersionMutex       sync.RWMutex
-	getVersionedResourceByVersionArgsForCall []struct {
-		atcVersion   atc.Version
-		resourceName string
-	}
-	getVersionedResourceByVersionReturns struct {
-		result1 db.SavedVersionedResource
-		result2 bool
-		result3 error
-	}
 	SaveIndependentInputMappingStub        func(inputVersions algorithm.InputMapping, jobName string) error
 	saveIndependentInputMappingMutex       sync.RWMutex
 	saveIndependentInputMappingArgsForCall []struct {
@@ -50,42 +37,6 @@ type FakeInputMapperDB struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
-}
-
-func (fake *FakeInputMapperDB) GetVersionedResourceByVersion(atcVersion atc.Version, resourceName string) (db.SavedVersionedResource, bool, error) {
-	fake.getVersionedResourceByVersionMutex.Lock()
-	fake.getVersionedResourceByVersionArgsForCall = append(fake.getVersionedResourceByVersionArgsForCall, struct {
-		atcVersion   atc.Version
-		resourceName string
-	}{atcVersion, resourceName})
-	fake.recordInvocation("GetVersionedResourceByVersion", []interface{}{atcVersion, resourceName})
-	fake.getVersionedResourceByVersionMutex.Unlock()
-	if fake.GetVersionedResourceByVersionStub != nil {
-		return fake.GetVersionedResourceByVersionStub(atcVersion, resourceName)
-	} else {
-		return fake.getVersionedResourceByVersionReturns.result1, fake.getVersionedResourceByVersionReturns.result2, fake.getVersionedResourceByVersionReturns.result3
-	}
-}
-
-func (fake *FakeInputMapperDB) GetVersionedResourceByVersionCallCount() int {
-	fake.getVersionedResourceByVersionMutex.RLock()
-	defer fake.getVersionedResourceByVersionMutex.RUnlock()
-	return len(fake.getVersionedResourceByVersionArgsForCall)
-}
-
-func (fake *FakeInputMapperDB) GetVersionedResourceByVersionArgsForCall(i int) (atc.Version, string) {
-	fake.getVersionedResourceByVersionMutex.RLock()
-	defer fake.getVersionedResourceByVersionMutex.RUnlock()
-	return fake.getVersionedResourceByVersionArgsForCall[i].atcVersion, fake.getVersionedResourceByVersionArgsForCall[i].resourceName
-}
-
-func (fake *FakeInputMapperDB) GetVersionedResourceByVersionReturns(result1 db.SavedVersionedResource, result2 bool, result3 error) {
-	fake.GetVersionedResourceByVersionStub = nil
-	fake.getVersionedResourceByVersionReturns = struct {
-		result1 db.SavedVersionedResource
-		result2 bool
-		result3 error
-	}{result1, result2, result3}
 }
 
 func (fake *FakeInputMapperDB) SaveIndependentInputMapping(inputVersions algorithm.InputMapping, jobName string) error {
@@ -192,8 +143,6 @@ func (fake *FakeInputMapperDB) DeleteNextInputMappingReturns(result1 error) {
 func (fake *FakeInputMapperDB) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.getVersionedResourceByVersionMutex.RLock()
-	defer fake.getVersionedResourceByVersionMutex.RUnlock()
 	fake.saveIndependentInputMappingMutex.RLock()
 	defer fake.saveIndependentInputMappingMutex.RUnlock()
 	fake.saveNextInputMappingMutex.RLock()

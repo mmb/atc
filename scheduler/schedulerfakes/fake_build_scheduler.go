@@ -3,20 +3,23 @@ package schedulerfakes
 
 import (
 	"sync"
-	"time"
 
 	"github.com/concourse/atc"
 	"github.com/concourse/atc/db"
+	"github.com/concourse/atc/db/algorithm"
 	"github.com/concourse/atc/scheduler"
 	"github.com/pivotal-golang/lager"
 )
 
 type FakeBuildScheduler struct {
-	ScheduleStub        func(logger lager.Logger, interval time.Duration) error
+	ScheduleStub        func(logger lager.Logger, versions *algorithm.VersionsDB, jobConfig atc.JobConfig, resourceConfigs atc.ResourceConfigs, resourceTypes atc.ResourceTypes) error
 	scheduleMutex       sync.RWMutex
 	scheduleArgsForCall []struct {
-		logger   lager.Logger
-		interval time.Duration
+		logger          lager.Logger
+		versions        *algorithm.VersionsDB
+		jobConfig       atc.JobConfig
+		resourceConfigs atc.ResourceConfigs
+		resourceTypes   atc.ResourceTypes
 	}
 	scheduleReturns struct {
 		result1 error
@@ -46,16 +49,19 @@ type FakeBuildScheduler struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeBuildScheduler) Schedule(logger lager.Logger, interval time.Duration) error {
+func (fake *FakeBuildScheduler) Schedule(logger lager.Logger, versions *algorithm.VersionsDB, jobConfig atc.JobConfig, resourceConfigs atc.ResourceConfigs, resourceTypes atc.ResourceTypes) error {
 	fake.scheduleMutex.Lock()
 	fake.scheduleArgsForCall = append(fake.scheduleArgsForCall, struct {
-		logger   lager.Logger
-		interval time.Duration
-	}{logger, interval})
-	fake.recordInvocation("Schedule", []interface{}{logger, interval})
+		logger          lager.Logger
+		versions        *algorithm.VersionsDB
+		jobConfig       atc.JobConfig
+		resourceConfigs atc.ResourceConfigs
+		resourceTypes   atc.ResourceTypes
+	}{logger, versions, jobConfig, resourceConfigs, resourceTypes})
+	fake.recordInvocation("Schedule", []interface{}{logger, versions, jobConfig, resourceConfigs, resourceTypes})
 	fake.scheduleMutex.Unlock()
 	if fake.ScheduleStub != nil {
-		return fake.ScheduleStub(logger, interval)
+		return fake.ScheduleStub(logger, versions, jobConfig, resourceConfigs, resourceTypes)
 	} else {
 		return fake.scheduleReturns.result1
 	}
@@ -67,10 +73,10 @@ func (fake *FakeBuildScheduler) ScheduleCallCount() int {
 	return len(fake.scheduleArgsForCall)
 }
 
-func (fake *FakeBuildScheduler) ScheduleArgsForCall(i int) (lager.Logger, time.Duration) {
+func (fake *FakeBuildScheduler) ScheduleArgsForCall(i int) (lager.Logger, *algorithm.VersionsDB, atc.JobConfig, atc.ResourceConfigs, atc.ResourceTypes) {
 	fake.scheduleMutex.RLock()
 	defer fake.scheduleMutex.RUnlock()
-	return fake.scheduleArgsForCall[i].logger, fake.scheduleArgsForCall[i].interval
+	return fake.scheduleArgsForCall[i].logger, fake.scheduleArgsForCall[i].versions, fake.scheduleArgsForCall[i].jobConfig, fake.scheduleArgsForCall[i].resourceConfigs, fake.scheduleArgsForCall[i].resourceTypes
 }
 
 func (fake *FakeBuildScheduler) ScheduleReturns(result1 error) {

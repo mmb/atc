@@ -18,7 +18,7 @@ import (
 	"github.com/pivotal-golang/lager/lagertest"
 )
 
-var _ = FDescribe("Scheduler", func() {
+var _ = Describe("Scheduler", func() {
 	var (
 		fakeDB           *schedulerfakes.FakeSchedulerDB
 		fakeInputMapper  *inputmapperfakes.FakeInputMapper
@@ -44,6 +44,173 @@ var _ = FDescribe("Scheduler", func() {
 		}
 
 		disaster = errors.New("bad thing")
+	})
+
+	Describe("Schedule", func() {
+		var (
+			versionsDB  *algorithm.VersionsDB
+			jobConfig   atc.JobConfig
+			scheduleErr error
+		)
+
+		JustBeforeEach(func() {
+			versionsDB = &algorithm.VersionsDB{JobIDs: map[string]int{"j1": 1}}
+
+			var waiter Waiter
+			scheduleErr = scheduler.Schedule(
+				lagertest.NewTestLogger("test"),
+				versionsDB,
+				jobConfig,
+				atc.ResourceConfigs{{Name: "some-resource"}},
+				atc.ResourceTypes{{Name: "some-resource-type"}},
+			)
+			if waiter != nil {
+				waiter.Wait()
+			}
+		})
+
+		Context("when the job has no inputs", func() {
+			BeforeEach(func() {
+				jobConfig = atc.JobConfig{Name: "some-job"}
+			})
+
+			Context("when saving the next input mapping fails", func() {
+				BeforeEach(func() {
+					fakeInputMapper.SaveNextInputMappingReturns(nil, disaster)
+				})
+
+				It("returns the error", func() {
+					Expect(scheduleErr).To(Equal(disaster))
+				})
+
+				It("saved the next input mapping for the right job and versions", func() {
+					Expect(fakeInputMapper.SaveNextInputMappingCallCount()).To(Equal(1))
+					_, actualVersionsDB, actualJobConfig := fakeInputMapper.SaveNextInputMappingArgsForCall(0)
+					Expect(actualVersionsDB).To(Equal(versionsDB))
+					Expect(actualJobConfig).To(Equal(jobConfig))
+				})
+			})
+
+			Context("when saving the next input mapping succeeds", func() {
+				BeforeEach(func() {
+					fakeInputMapper.SaveNextInputMappingReturns(algorithm.InputMapping{}, nil)
+				})
+
+				Context("when starting all pending builds fails", func() {
+					BeforeEach(func() {
+						fakeBuildStarter.TryStartAllPendingBuildsReturns(disaster)
+					})
+
+					It("returns the error", func() {
+						Expect(scheduleErr).To(Equal(disaster))
+					})
+
+					It("started all pending builds for the right job", func() {
+						Expect(fakeBuildStarter.TryStartAllPendingBuildsCallCount()).To(Equal(1))
+						_, actualJob, actualResources, actualResourceTypes := fakeBuildStarter.TryStartAllPendingBuildsArgsForCall(0)
+						Expect(actualJob).To(Equal(jobConfig))
+						Expect(actualResources).To(Equal(atc.ResourceConfigs{{Name: "some-resource"}}))
+						Expect(actualResourceTypes).To(Equal(atc.ResourceTypes{{Name: "some-resource-type"}}))
+					})
+				})
+
+				Context("when starting all pending builds succeeds", func() {
+					BeforeEach(func() {
+						fakeBuildStarter.TryStartAllPendingBuildsReturns(nil)
+					})
+
+					It("returns no error", func() {
+						Expect(scheduleErr).NotTo(HaveOccurred())
+					})
+
+					It("didn't create a pending build", func() {
+						Expect(fakeDB.EnsurePendingBuildExistsCallCount()).To(BeZero())
+					})
+				})
+			})
+		})
+
+		Context("when the job has one trigger: true input", func() {
+			BeforeEach(func() {
+				jobConfig = atc.JobConfig{
+					Name: "some-job",
+					Plan: atc.PlanSequence{
+						{Get: "a", Trigger: true},
+						{Get: "b", Trigger: false},
+					},
+				}
+
+				fakeBuildStarter.TryStartAllPendingBuildsReturns(nil)
+			})
+
+			Context("when no input mapping is found", func() {
+				BeforeEach(func() {
+					fakeInputMapper.SaveNextInputMappingReturns(algorithm.InputMapping{}, nil)
+				})
+
+				It("starts all pending builds and returns no error", func() {
+					Expect(fakeBuildStarter.TryStartAllPendingBuildsCallCount()).To(Equal(1))
+					Expect(scheduleErr).NotTo(HaveOccurred())
+				})
+
+				It("didn't create a pending build", func() {
+					Expect(fakeDB.EnsurePendingBuildExistsCallCount()).To(BeZero())
+				})
+			})
+
+			Context("when no first occurrence input has trigger: true", func() {
+				BeforeEach(func() {
+					fakeInputMapper.SaveNextInputMappingReturns(algorithm.InputMapping{
+						"a": algorithm.InputVersion{VersionID: 1, FirstOccurrence: false},
+						"b": algorithm.InputVersion{VersionID: 2, FirstOccurrence: true},
+					}, nil)
+				})
+
+				It("starts all pending builds and returns no error", func() {
+					Expect(fakeBuildStarter.TryStartAllPendingBuildsCallCount()).To(Equal(1))
+					Expect(scheduleErr).NotTo(HaveOccurred())
+				})
+
+				It("didn't create a pending build", func() {
+					Expect(fakeDB.EnsurePendingBuildExistsCallCount()).To(BeZero())
+				})
+			})
+
+			Context("when a first occurrence input has trigger: true", func() {
+				BeforeEach(func() {
+					fakeInputMapper.SaveNextInputMappingReturns(algorithm.InputMapping{
+						"a": algorithm.InputVersion{VersionID: 1, FirstOccurrence: true},
+						"b": algorithm.InputVersion{VersionID: 2, FirstOccurrence: false},
+					}, nil)
+				})
+
+				Context("when creating a pending build fails", func() {
+					BeforeEach(func() {
+						fakeDB.EnsurePendingBuildExistsReturns(disaster)
+					})
+
+					It("returns the error", func() {
+						Expect(scheduleErr).To(Equal(disaster))
+					})
+
+					It("created a pending build for the right job", func() {
+						Expect(fakeDB.EnsurePendingBuildExistsCallCount()).To(Equal(1))
+						Expect(fakeDB.EnsurePendingBuildExistsArgsForCall(0)).To(Equal("some-job"))
+					})
+				})
+
+				Context("when creating a pending build succeeds", func() {
+					BeforeEach(func() {
+						fakeDB.EnsurePendingBuildExistsReturns(nil)
+					})
+
+					It("starts all pending builds and returns no error", func() {
+						Expect(fakeBuildStarter.TryStartAllPendingBuildsCallCount()).To(Equal(1))
+						Expect(scheduleErr).NotTo(HaveOccurred())
+					})
+				})
+			})
+		})
 	})
 
 	Describe("TriggerImmediately", func() {
@@ -302,6 +469,62 @@ var _ = FDescribe("Scheduler", func() {
 							})
 						})
 					})
+				})
+			})
+		})
+	})
+
+	Describe("SaveNextInputMapping", func() {
+		var saveErr error
+
+		JustBeforeEach(func() {
+			saveErr = scheduler.SaveNextInputMapping(lagertest.NewTestLogger("test"), atc.JobConfig{Name: "some-job"})
+		})
+
+		Context("when loading the versions DB fails", func() {
+			BeforeEach(func() {
+				fakeDB.LoadVersionsDBReturns(nil, disaster)
+			})
+
+			It("returns the error", func() {
+				Expect(saveErr).To(Equal(disaster))
+			})
+		})
+
+		Context("when loading the versions DB succeeds", func() {
+			var versionsDB *algorithm.VersionsDB
+
+			BeforeEach(func() {
+				versionsDB = &algorithm.VersionsDB{JobIDs: map[string]int{"j1": 1}}
+				fakeDB.LoadVersionsDBReturns(versionsDB, nil)
+			})
+
+			Context("when saving the next input mapping fails", func() {
+				BeforeEach(func() {
+					fakeInputMapper.SaveNextInputMappingReturns(nil, disaster)
+				})
+
+				It("returns the error", func() {
+					Expect(saveErr).To(Equal(disaster))
+				})
+
+				It("saved the next input mapping for the right job and versions", func() {
+					Expect(fakeInputMapper.SaveNextInputMappingCallCount()).To(Equal(1))
+					_, actualVersionsDB, actualJobConfig := fakeInputMapper.SaveNextInputMappingArgsForCall(0)
+					Expect(actualVersionsDB).To(Equal(versionsDB))
+					Expect(actualJobConfig).To(Equal(atc.JobConfig{Name: "some-job"}))
+				})
+			})
+
+			Context("when saving the next input mapping succeeds", func() {
+				BeforeEach(func() {
+					fakeInputMapper.SaveNextInputMappingReturns(algorithm.InputMapping{
+						"some-input": algorithm.InputVersion{VersionID: 1, FirstOccurrence: true},
+					}, nil)
+				})
+
+				It("returns no error", func() {
+					Expect(saveErr).NotTo(HaveOccurred())
 				})
 			})
 		})

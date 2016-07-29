@@ -8,7 +8,6 @@ import (
 	"github.com/concourse/atc/config"
 	"github.com/concourse/atc/db"
 	"github.com/concourse/atc/db/algorithm"
-	"github.com/concourse/atc/metric"
 	"github.com/concourse/atc/scheduler/buildstarter"
 	"github.com/concourse/atc/scheduler/inputmapper"
 	"github.com/pivotal-golang/lager"
@@ -41,92 +40,34 @@ type Scanner interface {
 	Scan(lager.Logger, string) error
 }
 
-func (s *Scheduler) Schedule(logger lager.Logger, interval time.Duration) error {
-	logger = logger.Session("schedule")
-
-	schedulingLease, leased, err := s.DB.LeaseScheduling(logger, interval)
+func (s *Scheduler) Schedule(
+	logger lager.Logger,
+	versions *algorithm.VersionsDB,
+	jobConfig atc.JobConfig,
+	resourceConfigs atc.ResourceConfigs,
+	resourceTypes atc.ResourceTypes,
+) error {
+	inputMapping, err := s.InputMapper.SaveNextInputMapping(logger, versions, jobConfig)
 	if err != nil {
-		logger.Error("failed-to-acquire-scheduling-lease", err)
-		return nil
-	}
-
-	if !leased {
-		return nil
-	}
-
-	defer schedulingLease.Break()
-
-	pipelineConfig, _, found, err := s.DB.GetConfig()
-	if err != nil {
-		logger.Error("failed-to-get-pipeline-config", err)
 		return err
 	}
 
-	if !found {
-		logger.Debug("pipeline-config-disappeared")
-		return nil
-	}
+	for _, inputConfig := range config.JobInputs(jobConfig) {
+		inputVersion, ok := inputMapping[inputConfig.Name]
 
-	start := time.Now()
-
-	defer func() {
-		metric.SchedulingFullDuration{
-			PipelineName: s.DB.GetPipelineName(),
-			Duration:     time.Since(start),
-		}.Emit(logger)
-	}()
-
-	versions, err := s.DB.LoadVersionsDB()
-	if err != nil {
-		logger.Error("failed-to-load-versions-db", err)
-		return err
-	}
-
-	metric.SchedulingLoadVersionsDuration{
-		PipelineName: s.DB.GetPipelineName(),
-		Duration:     time.Since(start),
-	}.Emit(logger)
-
-	for _, job := range pipelineConfig.Jobs {
-		sLog := logger.Session("scheduling", lager.Data{
-			"job": job.Name,
-		})
-
-		jStart := time.Now()
-
-		defer metric.SchedulingJobDuration{
-			PipelineName: s.DB.GetPipelineName(),
-			JobName:      job.Name,
-			Duration:     time.Since(jStart),
-		}.Emit(sLog) // TODO: will this defer do the right thing?
-
-		inputMapping, err := s.InputMapper.SaveNextInputMapping(logger, versions, job)
-		if err != nil {
-			return err
-		}
-
-		for _, inputConfig := range config.JobInputs(job) {
-			inputVersion, ok := inputMapping[inputConfig.Name]
-
-			//trigger: true, and the version has not been used
-			if ok && inputVersion.FirstOccurrence && inputConfig.Trigger {
-				err := s.DB.EnsurePendingBuildExists(job.Name)
-				if err != nil {
-					logger.Error("failed-to-ensure-pending-build-exists", err)
-					return err
-				}
-
-				break
+		//trigger: true, and the version has not been used
+		if ok && inputVersion.FirstOccurrence && inputConfig.Trigger {
+			err := s.DB.EnsurePendingBuildExists(jobConfig.Name)
+			if err != nil {
+				logger.Error("failed-to-ensure-pending-build-exists", err)
+				return err
 			}
-		}
 
-		s.BuildStarter.TryStartAllPendingBuilds(logger, job, pipelineConfig.Resources, pipelineConfig.ResourceTypes)
-		if err != nil {
-			return err
+			break
 		}
 	}
 
-	return nil
+	return s.BuildStarter.TryStartAllPendingBuilds(logger, jobConfig, resourceConfigs, resourceTypes)
 }
 
 type Waiter interface {
