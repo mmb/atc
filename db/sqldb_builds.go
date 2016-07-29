@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/concourse/atc"
+	"github.com/concourse/atc/config"
 	"github.com/concourse/atc/event"
 	"github.com/lib/pq"
 )
 
-const buildColumns = "id, name, job_id, status, scheduled, inputs_determined, engine, engine_metadata, start_time, end_time, reap_time"
-const qualifiedBuildColumns = "b.id, b.name, b.job_id, b.status, b.scheduled, b.inputs_determined, b.engine, b.engine_metadata, b.start_time, b.end_time, b.reap_time, j.name as job_name, p.id as pipeline_id, p.name as pipeline_name"
+const buildColumns = "id, name, job_id, status, scheduled, engine, engine_metadata, start_time, end_time, reap_time"
+const qualifiedBuildColumns = "b.id, b.name, b.job_id, b.status, b.scheduled, b.engine, b.engine_metadata, b.start_time, b.end_time, b.reap_time, j.name as job_name, p.id as pipeline_id, p.name as pipeline_name"
 
 func (db *SQLDB) GetBuilds(page Page) ([]Build, Pagination, error) {
 	query := `
@@ -372,14 +373,7 @@ func (db *SQLDB) CreateOneOffBuild() (Build, error) {
 		return Build{}, err
 	}
 
-	_, err = tx.Exec(fmt.Sprintf(`
-		CREATE SEQUENCE %s MINVALUE 0
-	`, buildEventSeq(build.ID)))
-	if err != nil {
-		return Build{}, err
-	}
-
-	err = db.buildPrepHelper.CreateBuildPreparation(tx, build.ID)
+	err = createBuildEventSeq(tx, build.ID)
 	if err != nil {
 		return Build{}, err
 	}
@@ -393,38 +387,182 @@ func (db *SQLDB) CreateOneOffBuild() (Build, error) {
 }
 
 func (db *SQLDB) GetBuildPreparation(passedBuildID int) (BuildPreparation, bool, error) {
-	return db.buildPrepHelper.GetBuildPreparation(db.conn, passedBuildID)
-}
-
-func (db *SQLDB) UpdateBuildPreparation(buildPrep BuildPreparation) error {
-	tx, err := db.conn.Begin()
+	var jobID sql.NullInt64
+	err := db.conn.QueryRow(`
+SELECT job_id
+FROM builds
+WHERE id = $1 AND status = 'pending'
+		`, passedBuildID).Scan(&jobID)
 	if err != nil {
-		return err
+		if err == sql.ErrNoRows {
+			return BuildPreparation{}, false, nil
+		}
+
+		return BuildPreparation{}, false, err
 	}
 
-	defer tx.Rollback()
-
-	err = db.buildPrepHelper.UpdateBuildPreparation(tx, buildPrep)
-	if err != nil {
-		return err
+	if !jobID.Valid {
+		return BuildPreparation{
+			BuildID:             passedBuildID,
+			PausedPipeline:      BuildPreparationStatusNotBlocking,
+			PausedJob:           BuildPreparationStatusNotBlocking,
+			MaxRunningBuilds:    BuildPreparationStatusNotBlocking,
+			Inputs:              map[string]BuildPreparationStatus{},
+			InputsSatisfied:     BuildPreparationStatusNotBlocking,
+			MissingInputReasons: MissingInputReasons{},
+		}, true, nil
 	}
 
-	return tx.Commit()
-}
+	var (
+		pausedPipeline         bool
+		pausedJob              bool
+		maxInFlightReached     bool
+		pipelineID             int
+		resourceCheckIsRunning bool
+		jobName                string
+	)
+	err = db.conn.QueryRow(`
+			SELECT p.paused, j.paused, j.max_in_flight_reached, j.pipeline_id, j.name,
+				j.resource_check_finished_at > now() AND j.resource_check_waiver_end < $1
+			FROM builds b
+			JOIN jobs j
+				ON b.job_id = j.id
+			JOIN pipelines p
+				ON j.pipeline_id = p.id
+			WHERE b.id = $1
+		`, passedBuildID).Scan(&pausedPipeline, &pausedJob, &maxInFlightReached, &pipelineID, &jobName, &resourceCheckIsRunning)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return BuildPreparation{}, false, nil
+		}
+		return BuildPreparation{}, false, err
+	}
 
-func (db *SQLDB) ResetBuildPreparationsWithPipelinePaused(pipelineID int) error {
-	_, err := db.conn.Exec(`
-			UPDATE build_preparation
-			SET paused_pipeline='blocking',
-			    paused_job='unknown',
-					max_running_builds='unknown',
-					inputs='{}',
-					inputs_satisfied='unknown'
-			FROM build_preparation bp, builds b, jobs j
-			WHERE bp.build_id = b.id AND b.job_id = j.id
-				AND j.pipeline_id = $1 AND b.status = 'pending' AND b.scheduled = false
-		`, pipelineID)
-	return err
+	pausedPipelineStatus := BuildPreparationStatusNotBlocking
+	if pausedPipeline {
+		pausedPipelineStatus = BuildPreparationStatusBlocking
+	}
+
+	pausedJobStatus := BuildPreparationStatusNotBlocking
+	if pausedJob {
+		pausedJobStatus = BuildPreparationStatusBlocking
+	}
+
+	maxInFlightReachedStatus := BuildPreparationStatusNotBlocking
+	if maxInFlightReached {
+		maxInFlightReachedStatus = BuildPreparationStatusBlocking
+	}
+
+	if resourceCheckIsRunning {
+		return BuildPreparation{
+			BuildID:             passedBuildID,
+			PausedPipeline:      pausedPipelineStatus,
+			PausedJob:           pausedJobStatus,
+			MaxRunningBuilds:    maxInFlightReachedStatus,
+			Inputs:              map[string]BuildPreparationStatus{},
+			InputsSatisfied:     BuildPreparationStatusUnknown,
+			MissingInputReasons: MissingInputReasons{},
+		}, true, nil
+	}
+
+	pdbf := NewPipelineDBFactory(db.conn, db.bus, db)
+	pdb, err := pdbf.BuildWithID(pipelineID)
+	if err != nil {
+		return BuildPreparation{}, false, err
+	}
+
+	pipelineConfig, _, found, err := pdb.GetConfig()
+	if err != nil {
+		return BuildPreparation{}, false, err
+	}
+
+	if !found {
+		return BuildPreparation{}, false, nil
+	}
+
+	jobConfig, found := pipelineConfig.Jobs.Lookup(jobName)
+	if !found {
+		return BuildPreparation{}, false, nil
+	}
+
+	configInputs := config.JobInputs(jobConfig)
+
+	nextBuildInputs, found, err := pdb.GetNextBuildInputs(jobName)
+
+	inputsSatisfiedStatus := BuildPreparationStatusBlocking
+	inputs := map[string]BuildPreparationStatus{}
+	missingInputReasons := MissingInputReasons{}
+
+	if found {
+		inputsSatisfiedStatus = BuildPreparationStatusNotBlocking
+		for _, buildInput := range nextBuildInputs {
+			inputs[buildInput.Name] = BuildPreparationStatusNotBlocking
+		}
+	} else {
+		buildInputs, err := pdb.GetIndependentBuildInputs(jobName)
+		if err != nil {
+			return BuildPreparation{}, false, err
+		}
+
+		for _, configInput := range configInputs {
+			found := false
+			for _, buildInput := range buildInputs {
+				if buildInput.Name == configInput.Name {
+					found = true
+					break
+				}
+			}
+			if found {
+				inputs[configInput.Name] = BuildPreparationStatusNotBlocking
+			} else {
+				inputs[configInput.Name] = BuildPreparationStatusBlocking
+				if len(configInput.Passed) > 0 {
+					if configInput.Version != nil && configInput.Version.Pinned != nil {
+						_, found, err := pdb.GetVersionedResourceByVersion(configInput.Version.Pinned, configInput.Resource)
+						if err != nil {
+							return BuildPreparation{}, false, err
+						}
+
+						if found {
+							missingInputReasons.RegisterPassedConstraint(configInput.Name)
+						} else {
+							versionJSON, err := json.Marshal(configInput.Version.Pinned)
+							if err != nil {
+								return BuildPreparation{}, false, err
+							}
+
+							missingInputReasons.RegisterPinnedVersionUnavailable(configInput.Name, string(versionJSON))
+						}
+					} else {
+						missingInputReasons.RegisterPassedConstraint(configInput.Name)
+					}
+				} else {
+					if configInput.Version != nil && configInput.Version.Pinned != nil {
+						versionJSON, err := json.Marshal(configInput.Version.Pinned)
+						if err != nil {
+							return BuildPreparation{}, false, err
+						}
+
+						missingInputReasons.RegisterPinnedVersionUnavailable(configInput.Name, string(versionJSON))
+					} else {
+						missingInputReasons.RegisterNoVersions(configInput.Name)
+					}
+				}
+			}
+		}
+	}
+
+	buildPreparation := BuildPreparation{
+		BuildID:             passedBuildID,
+		PausedPipeline:      pausedPipelineStatus,
+		PausedJob:           pausedJobStatus,
+		MaxRunningBuilds:    maxInFlightReachedStatus,
+		Inputs:              inputs,
+		InputsSatisfied:     inputsSatisfiedStatus,
+		MissingInputReasons: missingInputReasons,
+	}
+
+	return buildPreparation, true, nil
 }
 
 func (db *SQLDB) StartBuild(buildID int, pipelineID int, engine, metadata string) (bool, error) {
@@ -752,13 +890,12 @@ func scanBuild(row scannable) (Build, bool, error) {
 	var jobID, pipelineID sql.NullInt64
 	var status string
 	var scheduled bool
-	var inputsDetermined bool
 	var engine, engineMetadata, jobName, pipelineName sql.NullString
 	var startTime pq.NullTime
 	var endTime pq.NullTime
 	var reapTime pq.NullTime
 
-	err := row.Scan(&id, &name, &jobID, &status, &scheduled, &inputsDetermined, &engine, &engineMetadata, &startTime, &endTime, &reapTime, &jobName, &pipelineID, &pipelineName)
+	err := row.Scan(&id, &name, &jobID, &status, &scheduled, &engine, &engineMetadata, &startTime, &endTime, &reapTime, &jobName, &pipelineID, &pipelineName)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return Build{}, false, nil
@@ -768,11 +905,10 @@ func scanBuild(row scannable) (Build, bool, error) {
 	}
 
 	build := Build{
-		ID:               id,
-		Name:             name,
-		Status:           Status(status),
-		Scheduled:        scheduled,
-		InputsDetermined: inputsDetermined,
+		ID:        id,
+		Name:      name,
+		Status:    Status(status),
+		Scheduled: scheduled,
 
 		Engine:         engine.String,
 		EngineMetadata: engineMetadata.String,

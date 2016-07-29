@@ -9,7 +9,11 @@ import (
 	"github.com/concourse/atc/radar"
 	"github.com/concourse/atc/resource"
 	"github.com/concourse/atc/scheduler"
+	"github.com/concourse/atc/scheduler/buildstarter"
+	"github.com/concourse/atc/scheduler/buildstarter/maxinflight"
 	"github.com/concourse/atc/scheduler/factory"
+	"github.com/concourse/atc/scheduler/inputmapper"
+	"github.com/concourse/atc/scheduler/inputmapper/inputconfig"
 	"github.com/pivotal-golang/clock"
 )
 
@@ -54,13 +58,21 @@ func (rsf *radarSchedulerFactory) BuildScheduler(pipelineDB db.PipelineDB, exter
 		externalURL,
 	)
 	return &scheduler.Scheduler{
-		PipelineDB: pipelineDB,
-		BuildsDB:   rsf.db,
-		Factory: factory.NewBuildFactory(
-			pipelineDB.GetPipelineID(),
-			atc.NewPlanFactory(time.Now().Unix()),
+		DB: pipelineDB,
+		InputMapper: inputmapper.NewInputMapper(
+			pipelineDB,
+			inputconfig.NewTransformer(pipelineDB),
 		),
-		Engine:  rsf.engine,
+		BuildStarter: buildstarter.NewBuildStarter(
+			pipelineDB,
+			rsf.db,
+			maxinflight.NewUpdater(pipelineDB),
+			factory.NewBuildFactory(
+				pipelineDB.GetPipelineID(),
+				atc.NewPlanFactory(time.Now().Unix()),
+			),
+			rsf.engine,
+		),
 		Scanner: scanner,
 	}
 }

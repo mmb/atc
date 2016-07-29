@@ -97,11 +97,8 @@ type DB interface {
 
 	CreateOneOffBuild() (Build, error)
 	GetBuildPreparation(buildID int) (BuildPreparation, bool, error)
-	UpdateBuildPreparation(buildPreparation BuildPreparation) error
-	ResetBuildPreparationsWithPipelinePaused(pipelineID int) error
 
 	LeaseBuildTracking(logger lager.Logger, buildID int, interval time.Duration) (Lease, bool, error)
-	LeaseBuildScheduling(logger lager.Logger, buildID int, interval time.Duration) (Lease, bool, error)
 	GetLease(logger lager.Logger, taskName string, interval time.Duration) (Lease, bool, error)
 
 	StartBuild(buildID int, pipelineID int, engineName, engineMetadata string) (bool, error)

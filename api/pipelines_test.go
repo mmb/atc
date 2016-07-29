@@ -549,8 +549,9 @@ var _ = Describe("Pipelines API", func() {
 									ResourceID: 77,
 									CheckOrder: 88,
 								},
-								BuildID: 66,
-								JobID:   13,
+								BuildID:   66,
+								JobID:     13,
+								InputName: "some-input-name",
 							},
 						},
 						JobIDs: map[string]int{
@@ -600,7 +601,8 @@ var _ = Describe("Pipelines API", func() {
 						"ResourceID": 77,
 						"BuildID": 66,
 						"JobID": 13,
-						"CheckOrder": 88
+						"CheckOrder": 88,
+						"InputName": "some-input-name"
 					}
 				],
 				"JobIDs": {
