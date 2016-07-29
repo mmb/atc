@@ -30,12 +30,18 @@ func (db *SQLDB) LeaseBuildTracking(logger lager.Logger, buildID int, interval t
 		},
 	}
 
-	acquired, err := lease.Acquire(interval)
+	renewed, err := lease.AttemptSign(interval)
 	if err != nil {
 		return nil, false, err
 	}
 
-	return lease, acquired, nil
+	if !renewed {
+		return nil, renewed, nil
+	}
+
+	lease.KeepSigned(interval)
+
+	return lease, true, nil
 }
 
 func (db *SQLDB) LeaseBuildScheduling(logger lager.Logger, buildID int, interval time.Duration) (Lease, bool, error) {
@@ -61,12 +67,18 @@ func (db *SQLDB) LeaseBuildScheduling(logger lager.Logger, buildID int, interval
 		},
 	}
 
-	acquired, err := lease.Acquire(interval)
+	renewed, err := lease.AttemptSign(interval)
 	if err != nil {
 		return nil, false, err
 	}
 
-	return lease, acquired, nil
+	if !renewed {
+		return nil, renewed, nil
+	}
+
+	lease.KeepSigned(interval)
+
+	return lease, true, nil
 }
 
 func (db *SQLDB) GetLease(logger lager.Logger, taskName string, interval time.Duration) (Lease, bool, error) {
@@ -98,10 +110,16 @@ func (db *SQLDB) GetLease(logger lager.Logger, taskName string, interval time.Du
 		},
 	}
 
-	acquired, err := lease.Acquire(interval)
+	renewed, err := lease.AttemptSign(interval)
 	if err != nil {
 		return nil, false, err
 	}
 
-	return lease, acquired, nil
+	if !renewed {
+		return nil, renewed, nil
+	}
+
+	lease.KeepSigned(interval)
+
+	return lease, true, nil
 }

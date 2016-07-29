@@ -52,15 +52,21 @@ func NewLeaseForTesting(conn Conn, logger lager.Logger, leaseTester LeaseTester,
 		breakFunc:       func() { leaseTester.Break() },
 	}
 
-	acquired, err := lease.Acquire(interval)
+	renewed, err := lease.AttemptSign(interval)
 	if err != nil {
 		return nil, false, err
 	}
 
-	return lease, acquired, nil
+	if !renewed {
+		return nil, renewed, nil
+	}
+
+	lease.KeepSigned(interval)
+
+	return lease, true, nil
 }
 
-func (l *lease) Acquire(interval time.Duration) (bool, error) {
+func (l *lease) AttemptSign(interval time.Duration) (bool, error) {
 	tx, err := l.conn.Begin()
 	if err != nil {
 		return false, err
@@ -87,6 +93,10 @@ func (l *lease) Acquire(interval time.Duration) (bool, error) {
 		return false, err
 	}
 
+	return true, nil
+}
+
+func (l *lease) KeepSigned(interval time.Duration) {
 	l.medalChan = make(chan struct{}, 1)
 	l.medalChan <- struct{}{}
 
@@ -96,7 +106,6 @@ func (l *lease) Acquire(interval time.Duration) (bool, error) {
 	l.running.Add(1)
 
 	go l.keepLeased(interval)
-	return true, nil
 }
 
 func (l *lease) Break() {
