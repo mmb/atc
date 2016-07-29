@@ -1108,7 +1108,7 @@ var _ = Describe("Jobs API", func() {
 							Status:       db.StatusStarted,
 							StartTime:    time.Unix(1, 0),
 							EndTime:      time.Unix(100, 0),
-						}, nil)
+						}, nil, nil)
 					})
 
 					It("triggers using the current config", func() {
@@ -1156,7 +1156,7 @@ var _ = Describe("Jobs API", func() {
 
 				Context("when triggering the build fails", func() {
 					BeforeEach(func() {
-						fakeScheduler.TriggerImmediatelyReturns(db.Build{}, errors.New("oh no!"))
+						fakeScheduler.TriggerImmediatelyReturns(db.Build{}, nil, errors.New("oh no!"))
 					})
 
 					It("returns 500", func() {

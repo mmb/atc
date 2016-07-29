@@ -24,7 +24,7 @@ type FakeBuildScheduler struct {
 	scheduleReturns struct {
 		result1 error
 	}
-	TriggerImmediatelyStub        func(logger lager.Logger, jobConfig atc.JobConfig, resourceConfigs atc.ResourceConfigs, resourceTypes atc.ResourceTypes) (db.Build, error)
+	TriggerImmediatelyStub        func(logger lager.Logger, jobConfig atc.JobConfig, resourceConfigs atc.ResourceConfigs, resourceTypes atc.ResourceTypes) (db.Build, scheduler.Waiter, error)
 	triggerImmediatelyMutex       sync.RWMutex
 	triggerImmediatelyArgsForCall []struct {
 		logger          lager.Logger
@@ -34,7 +34,8 @@ type FakeBuildScheduler struct {
 	}
 	triggerImmediatelyReturns struct {
 		result1 db.Build
-		result2 error
+		result2 scheduler.Waiter
+		result3 error
 	}
 	SaveNextInputMappingStub        func(logger lager.Logger, job atc.JobConfig) error
 	saveNextInputMappingMutex       sync.RWMutex
@@ -86,7 +87,7 @@ func (fake *FakeBuildScheduler) ScheduleReturns(result1 error) {
 	}{result1}
 }
 
-func (fake *FakeBuildScheduler) TriggerImmediately(logger lager.Logger, jobConfig atc.JobConfig, resourceConfigs atc.ResourceConfigs, resourceTypes atc.ResourceTypes) (db.Build, error) {
+func (fake *FakeBuildScheduler) TriggerImmediately(logger lager.Logger, jobConfig atc.JobConfig, resourceConfigs atc.ResourceConfigs, resourceTypes atc.ResourceTypes) (db.Build, scheduler.Waiter, error) {
 	fake.triggerImmediatelyMutex.Lock()
 	fake.triggerImmediatelyArgsForCall = append(fake.triggerImmediatelyArgsForCall, struct {
 		logger          lager.Logger
@@ -99,7 +100,7 @@ func (fake *FakeBuildScheduler) TriggerImmediately(logger lager.Logger, jobConfi
 	if fake.TriggerImmediatelyStub != nil {
 		return fake.TriggerImmediatelyStub(logger, jobConfig, resourceConfigs, resourceTypes)
 	} else {
-		return fake.triggerImmediatelyReturns.result1, fake.triggerImmediatelyReturns.result2
+		return fake.triggerImmediatelyReturns.result1, fake.triggerImmediatelyReturns.result2, fake.triggerImmediatelyReturns.result3
 	}
 }
 
@@ -115,12 +116,13 @@ func (fake *FakeBuildScheduler) TriggerImmediatelyArgsForCall(i int) (lager.Logg
 	return fake.triggerImmediatelyArgsForCall[i].logger, fake.triggerImmediatelyArgsForCall[i].jobConfig, fake.triggerImmediatelyArgsForCall[i].resourceConfigs, fake.triggerImmediatelyArgsForCall[i].resourceTypes
 }
 
-func (fake *FakeBuildScheduler) TriggerImmediatelyReturns(result1 db.Build, result2 error) {
+func (fake *FakeBuildScheduler) TriggerImmediatelyReturns(result1 db.Build, result2 scheduler.Waiter, result3 error) {
 	fake.TriggerImmediatelyStub = nil
 	fake.triggerImmediatelyReturns = struct {
 		result1 db.Build
-		result2 error
-	}{result1, result2}
+		result2 scheduler.Waiter
+		result3 error
+	}{result1, result2, result3}
 }
 
 func (fake *FakeBuildScheduler) SaveNextInputMapping(logger lager.Logger, job atc.JobConfig) error {

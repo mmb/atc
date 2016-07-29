@@ -22,7 +22,12 @@ type BuildScheduler interface {
 		resourceConfigs atc.ResourceConfigs,
 		resourceTypes atc.ResourceTypes,
 	) error
-	TriggerImmediately(logger lager.Logger, jobConfig atc.JobConfig, resourceConfigs atc.ResourceConfigs, resourceTypes atc.ResourceTypes) (db.Build, error)
+	TriggerImmediately(
+		logger lager.Logger,
+		jobConfig atc.JobConfig,
+		resourceConfigs atc.ResourceConfigs,
+		resourceTypes atc.ResourceTypes,
+	) (db.Build, Waiter, error)
 	SaveNextInputMapping(logger lager.Logger, job atc.JobConfig) error
 }
 
