@@ -18,9 +18,9 @@ const ResourceCheckingForJobTimeout = 5 * time.Minute
 
 type Scheduler struct {
 	DB           SchedulerDB
-	Scanner      Scanner
-	BuildStarter buildstarter.BuildStarter
 	InputMapper  inputmapper.InputMapper
+	BuildStarter buildstarter.BuildStarter
+	Scanner      Scanner
 }
 
 //go:generate counterfeiter . SchedulerDB
