@@ -1,3 +1,5 @@
+var DEBUG = {};
+
 var KEY_HEIGHT = 20;
 var KEY_SPACING = 10;
 var RANK_GROUP_SPACING = 50;
@@ -181,48 +183,46 @@ Graph.prototype.layout = function() {
     }
   }
 
-  if (window.location.hash != "#untug") {
-    var iterations = 0;
-
-    var anyChanged = true;
-    while (anyChanged) {
-      anyChanged = false;
-      for (var c in rankGroups) {
-        if (rankGroups[c].tug("outAlignment")) {
-          anyChanged = true;
-        }
-      }
-
-      for (var c in rankGroups) {
-        if (rankGroups[c].tug("inAlignment")) {
-          anyChanged = true;
-        }
-      }
-
-      for (var c in rankGroups) {
-        if (rankGroups[c].fillGaps()) {
-          anyChanged = true;
-        }
-      }
-
-      iterations++;
-
-      if (iterations == 10) {
-        console.log("took too long to stabilize; please report a bug here:");
-        console.log("");
-        console.log("    https://github.com/concourse/concourse/issues/new");
-        console.log("");
-        console.log("with your pipeline template, if possible.");
-        console.log("");
-        console.log("in the meantime, append #untug to the URL");
-        break;
-      }
-    }
-
-    for (var c in rankGroups) {
-      rankGroups[c].fixStragglers();
-    }
+  for (var c in rankGroups) {
+    rankGroups[c].groupByAlignment();
+    rankGroups[c].layout();
   }
+
+  // for (var repeat = 0; repeat < 11; repeat++) {
+  // for (var c in rankGroups) {
+  //   if (rankGroups[c].tug()) {
+  //     // for (var backwards = c - 1; backwards >= 0; backwards--) {
+  //     //   rankGroups[backwards].tug();
+  //     // }
+
+  //     anyChanged = true;
+  //   }
+  // }
+  // }
+
+  // var anyChanged = true;
+  // var iterations = 0;
+  // while (anyChanged) {
+  //   anyChanged = false;
+  //   for (var c in rankGroups) {
+  //     if (rankGroups[c].fixStragglers()) {
+  //       anyChanged = true;
+  //     }
+  //   }
+
+  //   iterations++;
+
+  //   if (iterations == 30) {
+  //     alert("bollocks");
+  //     break;
+  //   }
+  // }
+
+//     for (var c in rankGroups) {
+//       if (rankGroups[c].fillGaps()) {
+//         anyChanged = true;
+//       }
+//     }
 }
 
 Graph.prototype.computeRanks = function() {
@@ -429,12 +429,25 @@ function RankGroup(idx) {
   this.ordering = new Ordering();
 }
 
+function shuffle (array) {
+  var i = 0
+    , j = 0
+    , temp = null
+
+  for (i = array.length - 1; i > 0; i -= 1) {
+    j = Math.floor(Math.random() * (i + 1))
+    temp = array[i]
+    array[i] = array[j]
+    array[j] = temp
+  }
+}
+
 RankGroup.prototype.sortNodes = function() {
-  var nodes = this.nodes;
+  // shuffle(this.nodes);
 
-  var before = this.nodes.slice();
+  this.nodes.sort(function(a, b) {
+    var compare;
 
-  nodes.sort(function(a, b) {
     if (a._inEdges.length && b._inEdges.length) {
       // position nodes closer to their upstream sources
       var compare = a.highestUpstreamSource() - b.highestUpstreamSource();
@@ -500,17 +513,41 @@ RankGroup.prototype.sortNodes = function() {
 
     return compareNames(a.name, b.name);
   });
+}
 
-  var changed = false;
+Node.prototype.debug = function() {
+  return this.groupAlignment();
+}
 
-  for (var c in nodes) {
-    if (nodes[c] !== before[c]) {
-      changed = true;
+RankGroup.prototype.groupByAlignment = function() {
+  var byAlignment = [];
+
+  this.nodes.forEach(function(node) {
+    var alignment = node.groupAlignment();
+    if (byAlignment[alignment] === undefined) {
+      byAlignment[alignment] = [];
     }
+
+    byAlignment[alignment].push(node);
+
+    if (DEBUG[node.id]) {
+      console.log("alignment", alignment, byAlignment);
+    }
+  });
+
+  var newNodes = [];
+  for (var a in byAlignment) {
+    var group = byAlignment[a];
+    if (group === undefined) {
+      continue;
+    }
+
+    newNodes.push.apply(newNodes, group);
   }
 
-  return changed;
-}
+  this.nodes = newNodes;
+};
+
 
 RankGroup.prototype.mark = function() {
   for (var i in this.nodes) {
@@ -577,14 +614,20 @@ RankGroup.prototype.fillGaps = function() {
     }
   }
 
-  this.nodes.sort(function(a, b) {
-    return a._keyOffset - b._keyOffset;
-  });
+  this.syncNodeOrder();
 
   return changed;
 };
 
+RankGroup.prototype.syncNodeOrder = function() {
+  this.nodes.sort(function(a, b) {
+    return a._keyOffset - b._keyOffset;
+  });
+};
+
 RankGroup.prototype.fixStragglers = function() {
+  var changed = false;
+
   this.setOrdering();
 
   for (var i = 0; i < this.nodes.length; i++) {
@@ -607,7 +650,7 @@ RankGroup.prototype.fixStragglers = function() {
     }
 
     alignments.sort(function(a, b) {
-      // i have javascript
+      // i hate javascript
       return a - b;
     });
 
@@ -621,6 +664,7 @@ RankGroup.prototype.fixStragglers = function() {
 
       if (this.moveTo(align, node)) {
         aligned = true;
+        changed = true;
         break;
       }
     }
@@ -629,15 +673,16 @@ RankGroup.prototype.fixStragglers = function() {
       for (var a in alignments) {
         var align = alignments[a];
         if (this.moveCloseTo(align, node)) {
+          changed = true;
           break;
         }
       }
     }
   }
 
-  this.nodes.sort(function(a, b) {
-    return a._keyOffset - b._keyOffset;
-  });
+  this.syncNodeOrder();
+
+  return changed;
 };
 
 RankGroup.prototype.moveCloseTo = function(align, node) {
@@ -661,17 +706,13 @@ RankGroup.prototype.moveTo = function(align, node) {
   return false;
 };
 
-RankGroup.prototype.tug = function(direction) {
+RankGroup.prototype.tug = function() {
   var changed = false;
 
   for (var i = 0; i < this.nodes.length; i++) {
     var node = this.nodes[i];
 
-    var align = node[direction]();
-    if (align === undefined) {
-      continue;
-    }
-
+    var align = node.groupAlignment();
     if (align <= node._keyOffset) {
       continue;
     }
@@ -864,6 +905,41 @@ Node.prototype.highestDownstreamTarget = function() {
   return minY;
 };
 
+Node.prototype.groupAlignment = function() {
+  // if (this._inEdges.length === 0 && this._outEdges.length === 1) { // TODO: 1 bit is sketchy
+  //   return this._outEdges[0].target.node.groupAlignment();
+  // }
+
+  // if (this._inEdges.length === 1 && this._outEdges.length === 0) { // TODO: 1 bit is sketchy
+  //   return this._inEdges[0].source.node.groupAlignment();
+  // }
+
+  var inAlign = this.inGroupAlignment();
+  var outAlign = this.outGroupAlignment();
+
+  if (inAlign === undefined && outAlign === undefined) {
+    return this._keyOffset;
+  }
+
+  if (inAlign === undefined) {
+    return outAlign;
+  }
+
+  if (outAlign === undefined) {
+    return inAlign;
+  }
+
+  return Math.max(inAlign, outAlign);
+};
+
+Node.prototype.inGroupAlignment = function() {
+  return this.edgeGroupAlignment("_inEdges", "source", "_outEdges", "target");
+};
+
+Node.prototype.outGroupAlignment = function() {
+  return this.edgeGroupAlignment("_outEdges", "target", "_inEdges", "source");
+}
+
 Node.prototype.inAlignment = function() {
   return this.edgeAlignment("_inEdges", "source");
 };
@@ -872,11 +948,64 @@ Node.prototype.outAlignment = function() {
   return this.edgeAlignment("_outEdges", "target");
 }
 
-Node.prototype.edgeAlignment = function(edges, end) {
+Node.prototype.edgeGroupAlignment = function(direction, end, oppositeDirection, oppositeEnd) {
+  // the lowest node out of the highest node of each rank following the edges
+
+  var highestNodeAtRank, nodeInterestingness;
+
+  for (var e in this[direction]) {
+    var edge = this[direction][e];
+    var node = edge[end].node;
+
+    var interestingness = 0;
+
+    // if (node._edgeKeys.length > 1) {
+    //   // going to a node with more than one key
+    //   interestingness++;
+    // }
+
+    if (node[direction].length > 0) {
+      // going to a node that connects to other nodes
+      interestingness++;
+    }
+
+    if (interestingness !== undefined && interestingness < nodeInterestingness) {
+      // boring; don't align with it
+      continue;
+    }
+
+    if (highestNodeAtRank === undefined || interestingness > nodeInterestingness || node._keyOffset < highestNodeAtRank._keyOffset) {
+      highestNodeAtRank = node;
+      nodeInterestingness = interestingness;
+    }
+  }
+
+  if (highestNodeAtRank === undefined) {
+    return undefined;
+  }
+
+  // TODO: this seems fishy
+  var recurse = highestNodeAtRank.edgeGroupAlignment(direction, end, oppositeDirection, oppositeEnd);
+  if (recurse === undefined) {
+    if (this[oppositeDirection].length === 0) {
+      return highestNodeAtRank._keyOffset;
+    } else {
+      return Math.max(this._keyOffset, highestNodeAtRank._keyOffset);
+    }
+  }
+
+  if (this[oppositeDirection].length === 0) {
+    return recurse;
+  } else {
+    return Math.max(this._keyOffset, recurse);
+  }
+}
+
+Node.prototype.edgeAlignment = function(direction, end) {
   var minAlignment, alignmentInterestingness;
 
-  for (var e in this[edges]) {
-    var edge = this[edges][e];
+  for (var e in this[direction]) {
+    var edge = this[direction][e];
     var alignment = edge[end].effectiveKeyOffset() - this._edgeKeys.indexOf(edge.key);
 
     var interestingness = 0;

@@ -53,6 +53,11 @@ function drawContinuously(svg, groups) {
     })
 
     function highlight(thing) {
+      DEBUG[thing.id] = true;
+      if (thing.debug !== undefined) {
+        console.log(thing.debug());
+      }
+
       if (!thing.key) {
         return
       }
@@ -77,6 +82,7 @@ function drawContinuously(svg, groups) {
     }
 
     function lowlight(thing) {
+      DEBUG[thing.id] = false;
       if (!thing.key) {
         return
       }
