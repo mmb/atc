@@ -4,7 +4,6 @@ import (
 	"html/template"
 	"net/http"
 
-	"github.com/concourse/atc"
 	"github.com/concourse/atc/web"
 	"github.com/pivotal-golang/lager"
 	"github.com/tedsuo/rata"
@@ -29,8 +28,8 @@ func NewHandler(
 }
 
 type TemplateData struct {
-	AuthMethods []atc.AuthMethod
-	Redirect    string
+	TeamName string
+	Redirect string
 }
 
 func (handler *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -41,31 +40,18 @@ func (handler *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			handler.logger.Error("failed-to-generate-index-path", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
-		} else {
-			redirect = indexPath
 		}
+		redirect = indexPath
 	}
-
-	client := handler.clientFactory.Build(r)
 
 	teamName := r.FormValue(":team_name")
-	if teamName == "" {
-		teamName = atc.DefaultTeamName
-	}
-	team := client.Team(teamName)
-	authMethods, err := team.ListAuthMethods()
-	if err != nil {
-		handler.logger.Error("failed-to-list-auth-methods", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 
-	err = handler.template.Execute(w, TemplateData{
-		AuthMethods: authMethods,
-		Redirect:    redirect,
+	err := handler.template.Execute(w, TemplateData{
+		TeamName: teamName,
+		Redirect: redirect,
 	})
 	if err != nil {
-		handler.logger.Info("failed-to-generate-index-template", lager.Data{
+		handler.logger.Info("failed-to-generate-login-template", lager.Data{
 			"error": err.Error(),
 		})
 	}

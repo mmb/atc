@@ -52,7 +52,8 @@ func (wrappa *APIAuthWrappa) Wrap(handlers rata.Handlers) rata.Handlers {
 			atc.ListResources,
 			atc.ListResourceVersions,
 			atc.ListPipelines,
-			atc.GetPipeline:
+			atc.GetPipeline,
+			atc.ListTeams:
 
 		// authenticated
 		case atc.GetAuthToken,

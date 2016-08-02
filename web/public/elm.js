@@ -15392,6 +15392,16 @@ var _concourse$atc$BuildPage$main = {
 		})
 };
 
+var _concourse$atc$Concourse_Team$Team = function (a) {
+	return {name: a};
+};
+var _concourse$atc$Concourse_Team$decodeTeams = _elm_lang$core$Json_Decode$list(
+	A2(
+		_elm_lang$core$Json_Decode$object1,
+		_concourse$atc$Concourse_Team$Team,
+		A2(_elm_lang$core$Json_Decode_ops[':='], 'name', _elm_lang$core$Json_Decode$string)));
+var _concourse$atc$Concourse_Team$fetchTeams = A2(_evancz$elm_http$Http$get, _concourse$atc$Concourse_Team$decodeTeams, '/api/v1/teams');
+
 var _concourse$atc$Job$paginationParam = function (page) {
 	var _p0 = page.direction;
 	if (_p0.ctor === 'Since') {
@@ -16439,11 +16449,182 @@ var _concourse$atc$JobPage$main = {
 		})
 };
 
+var _concourse$atc$Login$viewTeam = function (team) {
+	return A2(
+		_elm_lang$html$Html$div,
+		_elm_lang$core$Native_List.fromArray(
+			[]),
+		_elm_lang$core$Native_List.fromArray(
+			[
+				_elm_lang$html$Html$text(
+				A2(_elm_lang$core$Basics_ops['++'], 'team: ', team.name))
+			]));
+};
+var _concourse$atc$Login$update = F2(
+	function (action, model) {
+		var _p0 = action;
+		switch (_p0.ctor) {
+			case 'Noop':
+				return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+			case 'FilterTeams':
+				return {
+					ctor: '_Tuple2',
+					_0: _elm_lang$core$Native_Utils.update(
+						model,
+						{teamFilter: _p0._0}),
+					_1: _elm_lang$core$Platform_Cmd$none
+				};
+			default:
+				if (_p0._0.ctor === 'Ok') {
+					return {
+						ctor: '_Tuple2',
+						_0: _elm_lang$core$Native_Utils.update(
+							model,
+							{
+								teams: _elm_lang$core$Maybe$Just(_p0._0._0)
+							}),
+						_1: _elm_lang$core$Platform_Cmd$none
+					};
+				} else {
+					return A2(
+						_elm_lang$core$Debug$log,
+						A2(
+							_elm_lang$core$Basics_ops['++'],
+							'failed to fetch teams: ',
+							_elm_lang$core$Basics$toString(_p0._0._0)),
+						{ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none});
+				}
+		}
+	});
+var _concourse$atc$Login$Model = F3(
+	function (a, b, c) {
+		return {teamName: a, teamFilter: b, teams: c};
+	});
+var _concourse$atc$Login$Flags = F2(
+	function (a, b) {
+		return {teamName: a, redirect: b};
+	});
+var _concourse$atc$Login$TeamsFetched = function (a) {
+	return {ctor: 'TeamsFetched', _0: a};
+};
+var _concourse$atc$Login$init = function (flags) {
+	var model = {
+		teamName: function () {
+			var _p1 = flags.teamName;
+			if (_p1 === '') {
+				return _elm_lang$core$Maybe$Nothing;
+			} else {
+				return _elm_lang$core$Maybe$Just(flags.teamName);
+			}
+		}(),
+		teamFilter: '',
+		teams: _elm_lang$core$Maybe$Nothing
+	};
+	return {
+		ctor: '_Tuple2',
+		_0: model,
+		_1: A2(
+			_elm_lang$core$Platform_Cmd$map,
+			_concourse$atc$Login$TeamsFetched,
+			A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _concourse$atc$Concourse_Team$fetchTeams))
+	};
+};
+var _concourse$atc$Login$FilterTeams = function (a) {
+	return {ctor: 'FilterTeams', _0: a};
+};
+var _concourse$atc$Login$view = function (model) {
+	return A2(
+		_elm_lang$html$Html$div,
+		_elm_lang$core$Native_List.fromArray(
+			[]),
+		_elm_lang$core$Native_List.fromArray(
+			[
+				A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html$text(
+						function () {
+							var _p2 = model.teamName;
+							if (_p2.ctor === 'Nothing') {
+								return 'who am i';
+							} else {
+								return A2(_elm_lang$core$Basics_ops['++'], 'hello world ', _p2._0);
+							}
+						}())
+					])),
+				A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						A2(
+						_elm_lang$html$Html$input,
+						_elm_lang$core$Native_List.fromArray(
+							[
+								_elm_lang$html$Html_Attributes$placeholder('filter teams'),
+								_elm_lang$html$Html_Events$onInput(_concourse$atc$Login$FilterTeams)
+							]),
+						_elm_lang$core$Native_List.fromArray(
+							[]))
+					])),
+				A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html$text(
+						A2(_elm_lang$core$Basics_ops['++'], 'you searched for ', model.teamFilter))
+					])),
+				A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[]),
+				A2(
+					_elm_lang$core$List$map,
+					_concourse$atc$Login$viewTeam,
+					A2(
+						_elm_lang$core$Maybe$withDefault,
+						_elm_lang$core$Native_List.fromArray(
+							[]),
+						model.teams)))
+			]));
+};
+var _concourse$atc$Login$Noop = {ctor: 'Noop'};
+
+var _concourse$atc$LoginPage$main = {
+	main: _elm_lang$html$Html_App$programWithFlags(
+		{
+			init: _concourse$atc$Login$init,
+			update: _concourse$atc$Login$update,
+			view: _concourse$atc$Login$view,
+			subscriptions: _elm_lang$core$Basics$always(_elm_lang$core$Platform_Sub$none)
+		}),
+	flags: A2(
+		_elm_lang$core$Json_Decode$andThen,
+		A2(_elm_lang$core$Json_Decode_ops[':='], 'redirect', _elm_lang$core$Json_Decode$string),
+		function (redirect) {
+			return A2(
+				_elm_lang$core$Json_Decode$andThen,
+				A2(_elm_lang$core$Json_Decode_ops[':='], 'teamName', _elm_lang$core$Json_Decode$string),
+				function (teamName) {
+					return _elm_lang$core$Json_Decode$succeed(
+						{redirect: redirect, teamName: teamName});
+				});
+		})
+};
+
 var Elm = {};
 Elm['BuildPage'] = Elm['BuildPage'] || {};
 _elm_lang$core$Native_Platform.addPublicModule(Elm['BuildPage'], 'BuildPage', typeof _concourse$atc$BuildPage$main === 'undefined' ? null : _concourse$atc$BuildPage$main);
 Elm['JobPage'] = Elm['JobPage'] || {};
 _elm_lang$core$Native_Platform.addPublicModule(Elm['JobPage'], 'JobPage', typeof _concourse$atc$JobPage$main === 'undefined' ? null : _concourse$atc$JobPage$main);
+Elm['LoginPage'] = Elm['LoginPage'] || {};
+_elm_lang$core$Native_Platform.addPublicModule(Elm['LoginPage'], 'LoginPage', typeof _concourse$atc$LoginPage$main === 'undefined' ? null : _concourse$atc$LoginPage$main);
 
 if (typeof define === "function" && define['amd'])
 {
