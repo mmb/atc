@@ -41,5 +41,5 @@ var Routes = rata.Routes{
 	{Path: "/login", Method: "GET", Name: LogIn},
 	{Path: "/teams/:team_name/login", Method: "GET", Name: TeamLogIn},
 	{Path: "/teams/:team_name/login/basic", Method: "GET", Name: GetBasicAuthLogIn},
-	{Path: "/teams/:team_name/login/basic", Method: "POST", Name: ProcessBasicAuthLogIn},
+	{Path: "/teams/:team_name/login", Method: "POST", Name: ProcessBasicAuthLogIn},
 }

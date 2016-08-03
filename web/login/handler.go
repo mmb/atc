@@ -28,7 +28,6 @@ func NewHandler(
 }
 
 type TemplateData struct {
-	TeamName string
 	Redirect string
 }
 
@@ -44,10 +43,7 @@ func (handler *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		redirect = indexPath
 	}
 
-	teamName := r.FormValue(":team_name")
-
 	err := handler.template.Execute(w, TemplateData{
-		TeamName: teamName,
 		Redirect: redirect,
 	})
 	if err != nil {

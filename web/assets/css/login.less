@@ -1,16 +1,63 @@
-.login-box .options li a {
-  display: block;
-  padding: 0 10px;
-  text-decoration: none;
-  font-size: 18px;
-  line-height: 40px;
-  font-family: inherit;
-  font-weight: bold;
-  margin: 0;
-  background: @base01;
-  color: @base06;
+.centered-contents {
+  text-align: center;
 }
 
-.login-box .options li a:hover {
-  background: @base02;
+.small-title {
+  font-size: 10pt;
+  font-style: italic;
+  color: @base04;
+  padding-top: 55px
+}
+
+.login-box {
+  display: inline-block;
+  margin: 22px;
+  text-align: left;
+  font-size: 12pt;
+  width: 450px;
+  height: 630px;
+  background: @base00;
+  line-height: 35px;
+}
+
+.login-box input {
+  width: 100%;
+  border: none;
+  padding: 0px 18px 0px 48px;
+  font: inherit;
+  background: inherit;
+  color: inherit;
+  &::-webkit-input-placeholder { /* WebKit, Blink, Edge */
+    color:    @base03;
+  }
+  &:-moz-placeholder { /* Mozilla Firefox 4 to 18 */
+     color:    @base03;
+     opacity:  1;
+  }
+  &::-moz-placeholder { /* Mozilla Firefox 19+ */
+     color:    @base03;
+     opacity:  1;
+  }
+  &:-ms-input-placeholder { /* Internet Explorer 10-11 */
+     color:    @base03;
+  }
+}
+
+.login-box form {
+  border-bottom: 1px solid @base01;
+  padding-right: 66px;
+}
+
+.login-box a {
+  border-bottom: 1px solid @base01;
+  display: block;
+  padding: 0px 18px;
+}
+
+.login-box i {
+  font-size: 1.1em;
+  position: absolute;
+  line-height: inherit;
+  padding-left: 18px;
+  color: @base02;
 }
