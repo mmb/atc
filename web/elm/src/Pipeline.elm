@@ -3,9 +3,11 @@ module Pipeline exposing (..)
 import Dict exposing (Dict)
 import Graph exposing (Graph)
 import Html exposing (Html)
-import Html.Attributes exposing (class, href)
+import Html.Attributes exposing (class, href, style)
 import Http
+import Set
 import Task
+import Matrix
 
 import Concourse.Job exposing (Job)
 import Concourse.BuildStatus exposing (BuildStatus)
@@ -73,28 +75,53 @@ view model =
       Html.text ("error: " ++ msg)
 
     Nothing ->
-      viewGrid (Grid.fromGraph model.graph)
+      Html.div [class "pipeline-table"] (
+        model.graph
+          |> Grid.fromGraph
+          |> Grid.toMatrix
+          |> Matrix.toList
+          |> List.map viewRow
+      )
+        -- viewGrid (Grid.fromGraph model.graph)
 
+viewRow : List (Maybe (Graph.NodeContext Node ())) -> Html Msg
+viewRow row =
+  Html.div [class "pipeline-table-row"] <|
+    List.map viewGridNode row
+
+viewGridNode : Maybe (Graph.NodeContext Node ()) -> Html Msg
+viewGridNode mnode =
+  case mnode of
+    Nothing ->
+      Html.div [class "spacer"] []
+
+    Just node ->
+      viewGraphNode node
 viewGrid : Grid Node () -> Html Msg
 viewGrid grid =
-  Html.div [class "pipeline"] [
-    case grid of
-      Grid.Cell node ->
-        viewGraphNode node
+  case grid of
+    Grid.Cell node ->
+      viewGraphNode node
 
-      Grid.Serial prev next ->
-        Html.div [class "serial-grid"] [
-          viewGrid prev,
-          viewGrid next
-        ]
+    Grid.Serial prev next ->
+      Html.div [class "serial-grid"]
+        (viewSerial prev ++ viewSerial next)
 
-      Grid.Parallel grids ->
-        Html.div [class "parallel-grid"] <|
-          List.map viewGrid grids
+    Grid.Parallel grids ->
+      Html.div [class "parallel-grid"] <|
+        List.map viewGrid grids
 
-      Grid.End ->
-        Html.text ""
-  ]
+    Grid.End ->
+      Html.text ""
+
+viewSerial : Grid Node () -> List (Html Msg)
+viewSerial grid =
+  case grid of
+    Grid.Serial prev next ->
+      viewSerial prev ++ viewSerial next
+
+    _ ->
+      [viewGrid grid]
 
 viewGraph : Graph Node () -> Html Msg
 viewGraph graph =
@@ -150,9 +177,13 @@ viewJobNode job =
           , href job.url
           ]
   in
-    Html.a linkAttrs [
+    Html.a linkAttrs [ --(style [("line-height", toString (30 * jobResources job - 10) ++ "px")] :: linkAttrs) [
       Html.text job.name
     ]
+
+jobResources : Job -> Int
+jobResources {inputs,outputs} =
+  Set.size (Set.fromList (List.map .resource inputs ++ List.map .resource outputs))
 
 viewInputNode : String -> Html Msg
 viewInputNode resourceName =
