@@ -131,73 +131,110 @@ view model =
               [ class "small-title" ]
               [ Html.text "select a team to login" ]
           , Html.div
-              [ class "login-box" ] <|
+              [ class "login-box team-selection" ] <|
               [ Html.form
                   [ Events.onSubmit <|
                       case (List.head filteredTeams, tModel.teamFilter) of
                         (Nothing, _) -> Noop
                         (Just _, "") -> Noop
                         (Just firstTeam, _) -> SelectTeam firstTeam.name
+                  , class "filter-form input-holder"
                   ]
                   [ Html.i [class "fa fa-fw fa-search"] []
                   , Html.input
                       [ Attributes.placeholder "filter teams"
+                      , Attributes.autofocus True
                       , Events.onInput FilterTeams
                       ]
                       []
                   ]
               ] ++
-                List.map viewTeam filteredTeams
+                case tModel.teams of
+                  Nothing ->
+                    [ Html.div [class "loading"]
+                        [ Html.i [class "fa fa-fw fa-spin fa-circle-o-notch"] []
+                        , Html.text "Loading..."
+                        ]
+                    ]
+                  Just _ -> List.map viewTeam filteredTeams
           ]
 
     Login lModel ->
       Html.div
-        [] <|
-        [ Html.div [] [ Html.text <| "logging in to " ++ lModel.teamName ]
-        ] ++
-          ( if List.member BasicMethod <| Maybe.withDefault [] lModel.authMethods then
-              [ Html.form
-                [ Attributes.method "post" ]
-                [ Html.div []
-                    [ Html.label
-                        [ Attributes.for "basic-auth-username-input" ]
-                        [ Html.text "username" ]
-                    ]
-                , Html.div []
-                    [ Html.input
-                        [ id "basic-auth-username-input"
-                        , Attributes.name "username"
-                        , Attributes.type' "text"
-                        ]
-                        []
-                    ]
-                , Html.div []
-                    [ Html.label
-                        [ Attributes.for "basic-auth-password-input" ]
-                        [ Html.text "password" ]
-                    ]
-                , Html.div []
-                    [ Html.input
-                        [ id "basic-auth-password-input"
-                        , Attributes.name "password"
-                        , Attributes.type' "password"
-                        ]
-                        []
-                    ]
-                , Html.div []
-                    [ Html.button
-                        [ Attributes.type' "submit" ]
-                        [ Html.text "login" ]
-                    ]
+        [ class "centered-contents" ]
+        [ Html.div [ class "small-title" ] []
+        , Html.div
+            [ class "login-box auth-methods" ] <|
+            [ Html.div
+                [ class "centered-contents auth-methods-title" ]
+                [ Html.text "logging in to "
+                , Html.span
+                    [ class "bright-text" ]
+                    [ Html.text lModel.teamName ]
                 ]
-              ]
-            else
-              []
-          ) ++
-          ( List.filterMap
-              viewLoginButton <|
-              Maybe.withDefault [] lModel.authMethods
-          )
+            ] ++
+              ( if List.member BasicMethod <| Maybe.withDefault [] lModel.authMethods then
+                  [ Html.form
+                    [ class "padded-top"
+                    , Attributes.method "post"
+                    ]
+                    [ Html.div []
+                        [ Html.label
+                          [ Attributes.for "basic-auth-username-input" ]
+                          [ Html.text "username" ]
+                        ]
+                    , Html.div
+                        [ class "input-holder" ]
+                        [ Html.input
+                            [ id "basic-auth-username-input"
+                            , Attributes.name "username"
+                            , Attributes.type' "text"
+                            ]
+                            []
+                        ]
+                    , Html.div []
+                      [ Html.label
+                          [ Attributes.for "basic-auth-password-input" ]
+                          [ Html.text "password" ]
+                      ]
+                    , Html.div
+                        [ class "input-holder" ]
+                        [ Html.input
+                            [ id "basic-auth-password-input"
+                            , Attributes.name "password"
+                            , Attributes.type' "password"
+                            ]
+                            []
+                        ]
+                    , Html.div
+                        [ class "centered-contents" ]
+                        [ Html.button
+                            [ Attributes.type' "submit" ]
+                            [ Html.text "login" ]
+                        ]
+                    ]
+                  ]
+                else
+                  []
+              ) ++
+              let
+                loginButtons =
+                  List.filterMap
+                    viewLoginButton <|
+                    Maybe.withDefault [] lModel.authMethods
+              in
+                if loginButtons == [] then []
+                else
+                  [ Html.div
+                      [ class "or-bar" ]
+                      [ Html.div [] []
+                      , Html.span [] [ Html.text "or" ]
+                      ]
+                  , Html.div
+                      [ class "centered-contents padded-top" ]
+                      loginButtons
+                  ]
+        ]
 
 filterTeams : String -> List Team -> List Team
 filterTeams teamFilter teams =
@@ -240,9 +277,6 @@ viewLoginButton method =
     BasicMethod -> Nothing
     OAuthMethod oAuthMethod ->
       Just <|
-        Html.form
-          [ Attributes.action oAuthMethod.authURL ]
-          [ Html.button
-            [ Attributes.type' "submit" ]
-            [ Html.text <| "login with " ++ oAuthMethod.displayName ]
-          ]
+        Html.a
+          [ Attributes.href oAuthMethod.authURL ]
+          [ Html.text <| "login with " ++ oAuthMethod.displayName ]

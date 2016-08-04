@@ -16872,24 +16872,15 @@ var _concourse$atc$Login$viewLoginButton = function (method) {
 		var _p1 = _p0._0;
 		return _elm_lang$core$Maybe$Just(
 			A2(
-				_elm_lang$html$Html$form,
+				_elm_lang$html$Html$a,
 				_elm_lang$core$Native_List.fromArray(
 					[
-						_elm_lang$html$Html_Attributes$action(_p1.authURL)
+						_elm_lang$html$Html_Attributes$href(_p1.authURL)
 					]),
 				_elm_lang$core$Native_List.fromArray(
 					[
-						A2(
-						_elm_lang$html$Html$button,
-						_elm_lang$core$Native_List.fromArray(
-							[
-								_elm_lang$html$Html_Attributes$type$('submit')
-							]),
-						_elm_lang$core$Native_List.fromArray(
-							[
-								_elm_lang$html$Html$text(
-								A2(_elm_lang$core$Basics_ops['++'], 'login with ', _p1.displayName))
-							]))
+						_elm_lang$html$Html$text(
+						A2(_elm_lang$core$Basics_ops['++'], 'login with ', _p1.displayName))
 					])));
 	}
 };
@@ -17131,15 +17122,15 @@ var _concourse$atc$Login$Noop = {ctor: 'Noop'};
 var _concourse$atc$Login$view = function (model) {
 	var _p12 = model;
 	if (_p12.ctor === 'TeamSelection') {
-		var _p14 = _p12._0;
+		var _p15 = _p12._0;
 		var filteredTeams = A2(
 			_concourse$atc$Login$filterTeams,
-			_p14.teamFilter,
+			_p15.teamFilter,
 			A2(
 				_elm_lang$core$Maybe$withDefault,
 				_elm_lang$core$Native_List.fromArray(
 					[]),
-				_p14.teams));
+				_p15.teams));
 		return A2(
 			_elm_lang$html$Html$div,
 			_elm_lang$core$Native_List.fromArray(
@@ -17162,7 +17153,7 @@ var _concourse$atc$Login$view = function (model) {
 					_elm_lang$html$Html$div,
 					_elm_lang$core$Native_List.fromArray(
 						[
-							_elm_lang$html$Html_Attributes$class('login-box')
+							_elm_lang$html$Html_Attributes$class('login-box team-selection')
 						]),
 					A2(
 						_elm_lang$core$Basics_ops['++'],
@@ -17177,7 +17168,7 @@ var _concourse$atc$Login$view = function (model) {
 											var _p13 = {
 												ctor: '_Tuple2',
 												_0: _elm_lang$core$List$head(filteredTeams),
-												_1: _p14.teamFilter
+												_1: _p15.teamFilter
 											};
 											if (_p13._0.ctor === 'Nothing') {
 												return _concourse$atc$Login$Noop;
@@ -17188,7 +17179,8 @@ var _concourse$atc$Login$view = function (model) {
 													return _concourse$atc$Login$SelectTeam(_p13._0._0.name);
 												}
 											}
-										}())
+										}()),
+										_elm_lang$html$Html_Attributes$class('filter-form input-holder')
 									]),
 								_elm_lang$core$Native_List.fromArray(
 									[
@@ -17205,149 +17197,253 @@ var _concourse$atc$Login$view = function (model) {
 										_elm_lang$core$Native_List.fromArray(
 											[
 												_elm_lang$html$Html_Attributes$placeholder('filter teams'),
+												_elm_lang$html$Html_Attributes$autofocus(true),
 												_elm_lang$html$Html_Events$onInput(_concourse$atc$Login$FilterTeams)
 											]),
 										_elm_lang$core$Native_List.fromArray(
 											[]))
 									]))
 							]),
-						A2(_elm_lang$core$List$map, _concourse$atc$Login$viewTeam, filteredTeams)))
+						function () {
+							var _p14 = _p15.teams;
+							if (_p14.ctor === 'Nothing') {
+								return _elm_lang$core$Native_List.fromArray(
+									[
+										A2(
+										_elm_lang$html$Html$div,
+										_elm_lang$core$Native_List.fromArray(
+											[
+												_elm_lang$html$Html_Attributes$class('loading')
+											]),
+										_elm_lang$core$Native_List.fromArray(
+											[
+												A2(
+												_elm_lang$html$Html$i,
+												_elm_lang$core$Native_List.fromArray(
+													[
+														_elm_lang$html$Html_Attributes$class('fa fa-fw fa-spin fa-circle-o-notch')
+													]),
+												_elm_lang$core$Native_List.fromArray(
+													[])),
+												_elm_lang$html$Html$text('Loading...')
+											]))
+									]);
+							} else {
+								return A2(_elm_lang$core$List$map, _concourse$atc$Login$viewTeam, filteredTeams);
+							}
+						}()))
 				]));
 	} else {
-		var _p15 = _p12._0;
+		var _p16 = _p12._0;
 		return A2(
 			_elm_lang$html$Html$div,
 			_elm_lang$core$Native_List.fromArray(
-				[]),
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				_elm_lang$core$Native_List.fromArray(
-					[
-						A2(
-						_elm_lang$html$Html$div,
-						_elm_lang$core$Native_List.fromArray(
-							[]),
+				[
+					_elm_lang$html$Html_Attributes$class('centered-contents')
+				]),
+			_elm_lang$core$Native_List.fromArray(
+				[
+					A2(
+					_elm_lang$html$Html$div,
+					_elm_lang$core$Native_List.fromArray(
+						[
+							_elm_lang$html$Html_Attributes$class('small-title')
+						]),
+					_elm_lang$core$Native_List.fromArray(
+						[])),
+					A2(
+					_elm_lang$html$Html$div,
+					_elm_lang$core$Native_List.fromArray(
+						[
+							_elm_lang$html$Html_Attributes$class('login-box auth-methods')
+						]),
+					A2(
+						_elm_lang$core$Basics_ops['++'],
 						_elm_lang$core$Native_List.fromArray(
 							[
-								_elm_lang$html$Html$text(
-								A2(_elm_lang$core$Basics_ops['++'], 'logging in to ', _p15.teamName))
-							]))
-					]),
-				A2(
-					_elm_lang$core$Basics_ops['++'],
-					A2(
-						_elm_lang$core$List$member,
-						_concourse$atc$Concourse_AuthMethod$BasicMethod,
+								A2(
+								_elm_lang$html$Html$div,
+								_elm_lang$core$Native_List.fromArray(
+									[
+										_elm_lang$html$Html_Attributes$class('centered-contents auth-methods-title')
+									]),
+								_elm_lang$core$Native_List.fromArray(
+									[
+										_elm_lang$html$Html$text('logging in to '),
+										A2(
+										_elm_lang$html$Html$span,
+										_elm_lang$core$Native_List.fromArray(
+											[
+												_elm_lang$html$Html_Attributes$class('bright-text')
+											]),
+										_elm_lang$core$Native_List.fromArray(
+											[
+												_elm_lang$html$Html$text(_p16.teamName)
+											]))
+									]))
+							]),
 						A2(
-							_elm_lang$core$Maybe$withDefault,
-							_elm_lang$core$Native_List.fromArray(
-								[]),
-							_p15.authMethods)) ? _elm_lang$core$Native_List.fromArray(
-						[
+							_elm_lang$core$Basics_ops['++'],
 							A2(
-							_elm_lang$html$Html$form,
-							_elm_lang$core$Native_List.fromArray(
+								_elm_lang$core$List$member,
+								_concourse$atc$Concourse_AuthMethod$BasicMethod,
+								A2(
+									_elm_lang$core$Maybe$withDefault,
+									_elm_lang$core$Native_List.fromArray(
+										[]),
+									_p16.authMethods)) ? _elm_lang$core$Native_List.fromArray(
 								[
-									_elm_lang$html$Html_Attributes$method('post')
-								]),
-							_elm_lang$core$Native_List.fromArray(
-								[
 									A2(
-									_elm_lang$html$Html$div,
+									_elm_lang$html$Html$form,
 									_elm_lang$core$Native_List.fromArray(
-										[]),
+										[
+											_elm_lang$html$Html_Attributes$class('padded-top'),
+											_elm_lang$html$Html_Attributes$method('post')
+										]),
 									_elm_lang$core$Native_List.fromArray(
 										[
 											A2(
-											_elm_lang$html$Html$label,
+											_elm_lang$html$Html$div,
+											_elm_lang$core$Native_List.fromArray(
+												[]),
 											_elm_lang$core$Native_List.fromArray(
 												[
-													_elm_lang$html$Html_Attributes$for('basic-auth-username-input')
-												]),
-											_elm_lang$core$Native_List.fromArray(
-												[
-													_elm_lang$html$Html$text('username')
-												]))
-										])),
-									A2(
-									_elm_lang$html$Html$div,
-									_elm_lang$core$Native_List.fromArray(
-										[]),
-									_elm_lang$core$Native_List.fromArray(
-										[
+													A2(
+													_elm_lang$html$Html$label,
+													_elm_lang$core$Native_List.fromArray(
+														[
+															_elm_lang$html$Html_Attributes$for('basic-auth-username-input')
+														]),
+													_elm_lang$core$Native_List.fromArray(
+														[
+															_elm_lang$html$Html$text('username')
+														]))
+												])),
 											A2(
-											_elm_lang$html$Html$input,
+											_elm_lang$html$Html$div,
 											_elm_lang$core$Native_List.fromArray(
 												[
-													_elm_lang$html$Html_Attributes$id('basic-auth-username-input'),
-													_elm_lang$html$Html_Attributes$name('username'),
-													_elm_lang$html$Html_Attributes$type$('text')
+													_elm_lang$html$Html_Attributes$class('input-holder')
 												]),
 											_elm_lang$core$Native_List.fromArray(
-												[]))
-										])),
-									A2(
-									_elm_lang$html$Html$div,
-									_elm_lang$core$Native_List.fromArray(
-										[]),
-									_elm_lang$core$Native_List.fromArray(
-										[
+												[
+													A2(
+													_elm_lang$html$Html$input,
+													_elm_lang$core$Native_List.fromArray(
+														[
+															_elm_lang$html$Html_Attributes$id('basic-auth-username-input'),
+															_elm_lang$html$Html_Attributes$name('username'),
+															_elm_lang$html$Html_Attributes$type$('text')
+														]),
+													_elm_lang$core$Native_List.fromArray(
+														[]))
+												])),
 											A2(
-											_elm_lang$html$Html$label,
+											_elm_lang$html$Html$div,
+											_elm_lang$core$Native_List.fromArray(
+												[]),
 											_elm_lang$core$Native_List.fromArray(
 												[
-													_elm_lang$html$Html_Attributes$for('basic-auth-password-input')
-												]),
-											_elm_lang$core$Native_List.fromArray(
-												[
-													_elm_lang$html$Html$text('password')
-												]))
-										])),
-									A2(
-									_elm_lang$html$Html$div,
-									_elm_lang$core$Native_List.fromArray(
-										[]),
-									_elm_lang$core$Native_List.fromArray(
-										[
+													A2(
+													_elm_lang$html$Html$label,
+													_elm_lang$core$Native_List.fromArray(
+														[
+															_elm_lang$html$Html_Attributes$for('basic-auth-password-input')
+														]),
+													_elm_lang$core$Native_List.fromArray(
+														[
+															_elm_lang$html$Html$text('password')
+														]))
+												])),
 											A2(
-											_elm_lang$html$Html$input,
+											_elm_lang$html$Html$div,
 											_elm_lang$core$Native_List.fromArray(
 												[
-													_elm_lang$html$Html_Attributes$id('basic-auth-password-input'),
-													_elm_lang$html$Html_Attributes$name('password'),
-													_elm_lang$html$Html_Attributes$type$('password')
+													_elm_lang$html$Html_Attributes$class('input-holder')
 												]),
 											_elm_lang$core$Native_List.fromArray(
-												[]))
-										])),
-									A2(
-									_elm_lang$html$Html$div,
-									_elm_lang$core$Native_List.fromArray(
-										[]),
-									_elm_lang$core$Native_List.fromArray(
-										[
+												[
+													A2(
+													_elm_lang$html$Html$input,
+													_elm_lang$core$Native_List.fromArray(
+														[
+															_elm_lang$html$Html_Attributes$id('basic-auth-password-input'),
+															_elm_lang$html$Html_Attributes$name('password'),
+															_elm_lang$html$Html_Attributes$type$('password')
+														]),
+													_elm_lang$core$Native_List.fromArray(
+														[]))
+												])),
 											A2(
-											_elm_lang$html$Html$button,
+											_elm_lang$html$Html$div,
 											_elm_lang$core$Native_List.fromArray(
 												[
-													_elm_lang$html$Html_Attributes$type$('submit')
+													_elm_lang$html$Html_Attributes$class('centered-contents')
 												]),
 											_elm_lang$core$Native_List.fromArray(
 												[
-													_elm_lang$html$Html$text('login')
+													A2(
+													_elm_lang$html$Html$button,
+													_elm_lang$core$Native_List.fromArray(
+														[
+															_elm_lang$html$Html_Attributes$type$('submit')
+														]),
+													_elm_lang$core$Native_List.fromArray(
+														[
+															_elm_lang$html$Html$text('login')
+														]))
 												]))
 										]))
-								]))
-						]) : _elm_lang$core$Native_List.fromArray(
-						[]),
-					A2(
-						_elm_lang$core$List$filterMap,
-						_concourse$atc$Login$viewLoginButton,
-						A2(
-							_elm_lang$core$Maybe$withDefault,
-							_elm_lang$core$Native_List.fromArray(
+								]) : _elm_lang$core$Native_List.fromArray(
 								[]),
-							_p15.authMethods)))));
+							function () {
+								var loginButtons = A2(
+									_elm_lang$core$List$filterMap,
+									_concourse$atc$Login$viewLoginButton,
+									A2(
+										_elm_lang$core$Maybe$withDefault,
+										_elm_lang$core$Native_List.fromArray(
+											[]),
+										_p16.authMethods));
+								return _elm_lang$core$Native_Utils.eq(
+									loginButtons,
+									_elm_lang$core$Native_List.fromArray(
+										[])) ? _elm_lang$core$Native_List.fromArray(
+									[]) : _elm_lang$core$Native_List.fromArray(
+									[
+										A2(
+										_elm_lang$html$Html$div,
+										_elm_lang$core$Native_List.fromArray(
+											[
+												_elm_lang$html$Html_Attributes$class('or-bar')
+											]),
+										_elm_lang$core$Native_List.fromArray(
+											[
+												A2(
+												_elm_lang$html$Html$div,
+												_elm_lang$core$Native_List.fromArray(
+													[]),
+												_elm_lang$core$Native_List.fromArray(
+													[])),
+												A2(
+												_elm_lang$html$Html$span,
+												_elm_lang$core$Native_List.fromArray(
+													[]),
+												_elm_lang$core$Native_List.fromArray(
+													[
+														_elm_lang$html$Html$text('or')
+													]))
+											])),
+										A2(
+										_elm_lang$html$Html$div,
+										_elm_lang$core$Native_List.fromArray(
+											[
+												_elm_lang$html$Html_Attributes$class('centered-contents padded-top')
+											]),
+										loginButtons)
+									]);
+							}())))
+				]));
 	}
 };
 

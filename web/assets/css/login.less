@@ -2,31 +2,94 @@
   text-align: center;
 }
 
+.auth-methods .padded-top {
+  padding-top: 10px;
+}
+
 .small-title {
   font-size: 10pt;
   font-style: italic;
   color: @base04;
-  padding-top: 55px
+  height: 75px;
+  position: relative;
+  top: 55px;
+  z-index: -1;
 }
 
 .login-box {
   display: inline-block;
-  margin: 22px;
   text-align: left;
   font-size: 12pt;
+  margin: 22px;
   width: 450px;
-  height: 630px;
   background: @base00;
+  color: @base04;
+}
+
+.team-selection {
+  height: 630px;
   line-height: 35px;
 }
 
-.login-box input {
-  width: 100%;
-  border: none;
-  padding: 0px 18px 0px 48px;
+.bright-text {
+  color: @base05;
+}
+
+.auth-methods {
+  padding-bottom: 56px;
+  padding-top: 10px;
+}
+
+.auth-methods-title {
+  margin-bottom: 20px;
+}
+
+.auth-methods form {
+  margin: 0px 40px;
+}
+
+.auth-methods label {
+  margin-bottom: 3px;
+  display: block;
+}
+
+.auth-methods .input-holder {
+  padding-right: 20px;
+}
+
+.auth-methods input {
+  background: @base01;
+  padding: 4px 10px;
+  margin-bottom: 12px;
+  border-radius: 2px;
+}
+
+.auth-methods button {
   font: inherit;
-  background: inherit;
+  background: @base02;
+  color: @base05;
+  border: none;
+  border-radius: 2px;
+  padding: 4px 22px;
+  margin: 10px 0px;
+}
+
+.auth-methods a {
+  display: inline-block;
+  width: 250px;
+  line-height: 30px;
+  text-align: center;
+  border-radius: 2px;
+  background: @base02;
+  color: @base05;
+  margin-bottom: 10px;
+}
+
+.login-box input {
+  font: inherit;
   color: inherit;
+  border: none;
+  width: 100%;
   &::-webkit-input-placeholder { /* WebKit, Blink, Edge */
     color:    @base03;
   }
@@ -43,21 +106,62 @@
   }
 }
 
-.login-box form {
-  border-bottom: 1px solid @base01;
+.filter-form input {
+  background: inherit;
+  padding: 0px 18px 0px 48px;
+}
+
+.team-selection .input-holder {
   padding-right: 66px;
 }
 
-.login-box a {
+.team-selection form {
+  border-bottom: 1px solid @base01;
+}
+
+.team-selection a {
   border-bottom: 1px solid @base01;
   display: block;
+  color: inherit;
   padding: 0px 18px;
 }
 
-.login-box i {
+.filter-form i {
   font-size: 1.1em;
   position: absolute;
   line-height: inherit;
   padding-left: 18px;
   color: @base02;
+}
+
+.loading {
+  line-height: inherit;
+}
+
+.loading i {
+  margin: 0px 10px;
+}
+
+.or-bar {
+  position: relative;
+  text-align: center;
+  margin: 0px 40px;
+  background: inherit;
+  color: @base03;
+}
+
+.or-bar div {
+  position: absolute;
+  height: 2px;
+  background: @base03;
+  width: 100%;
+  margin: 27px 0px;
+}
+
+.or-bar span {
+  line-height: 56px;
+  display: inline-block;
+  background: inherit;
+  position: relative;
+  padding: 0px 25px;
 }
