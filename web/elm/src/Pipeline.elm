@@ -3,7 +3,7 @@ module Pipeline exposing (..)
 import Dict exposing (Dict)
 import Graph exposing (Graph)
 import Html exposing (Html)
-import Html.Attributes exposing (class, href, style)
+import Html.Attributes exposing (class, href, style, rowspan)
 import Http
 import Set
 import Task
@@ -75,28 +75,41 @@ view model =
       Html.text ("error: " ++ msg)
 
     Nothing ->
-      Html.div [class "pipeline-table"] (
+      Html.table [class "pipeline-table"] (
         model.graph
           |> Grid.fromGraph
-          |> Grid.toMatrix
+          |> Grid.toMatrix nodeHeight
           |> Matrix.toList
           |> List.map viewRow
       )
         -- viewGrid (Grid.fromGraph model.graph)
 
-viewRow : List (Maybe (Graph.NodeContext Node ())) -> Html Msg
+nodeHeight : Graph.NodeContext Node () -> Int
+nodeHeight {node} =
+  case node.label of
+    JobNode job ->
+      max 1 (jobResources job)
+
+    _ ->
+      1
+
+viewRow : List (Grid.MatrixCell Node ()) -> Html Msg
 viewRow row =
-  Html.div [class "pipeline-table-row"] <|
+  Html.tr [] <|
     List.map viewGridNode row
 
-viewGridNode : Maybe (Graph.NodeContext Node ()) -> Html Msg
+viewGridNode : Grid.MatrixCell Node () -> Html Msg
 viewGridNode mnode =
   case mnode of
-    Nothing ->
-      Html.div [class "spacer"] []
+    Grid.MatrixSpacer ->
+      Html.td [class "spacer"] []
 
-    Just node ->
+    Grid.MatrixNode node ->
       viewGraphNode node
+
+    Grid.MatrixFilled ->
+      Html.text ""
+
 viewGrid : Grid Node () -> Html Msg
 viewGrid grid =
   case grid of
@@ -134,8 +147,8 @@ viewGraphRank ncs =
     List.map viewGraphNode ncs
 
 viewGraphNode : Graph.NodeContext Node () -> Html Msg
-viewGraphNode {node} =
-  Html.div [class "node", Html.Attributes.id ("node-" ++ toString node.id)] [viewNode node.label]
+viewGraphNode nc =
+  Html.td [rowspan (nodeHeight nc), class "node", Html.Attributes.id ("node-" ++ toString nc.node.id)] [viewNode nc.node.label]
 
 viewNode : Node -> Html Msg
 viewNode node =
@@ -177,7 +190,7 @@ viewJobNode job =
           , href job.url
           ]
   in
-    Html.a linkAttrs [ --(style [("line-height", toString (30 * jobResources job - 10) ++ "px")] :: linkAttrs) [
+    Html.a (style [("line-height", toString (30 * jobResources job - 10) ++ "px")] :: linkAttrs) [
       Html.text job.name
     ]
 

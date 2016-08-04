@@ -1,4 +1,4 @@
-module Grid exposing (Grid(..), insert, fromGraph, toMatrix)
+module Grid exposing (Grid(..), insert, fromGraph, MatrixCell(..), toMatrix)
 
 import Graph
 import IntDict
@@ -15,26 +15,41 @@ fromGraph graph =
   List.foldl insert End <|
     List.concat (Graph.heightLevels graph)
 
-toMatrix : Grid n e -> Matrix (Maybe (Graph.NodeContext n e))
-toMatrix grid =
-  toMatrix' 0 0 (Matrix.matrix (height grid) (width grid) (always Nothing)) grid
+type alias HeightFunc n e =
+  Graph.NodeContext n e -> Int
 
-toMatrix' : Int -> Int -> Matrix (Maybe (Graph.NodeContext n e)) -> Grid n e -> Matrix (Maybe (Graph.NodeContext n e))
-toMatrix' row col matrix grid =
+type MatrixCell n e
+  = MatrixNode (Graph.NodeContext n e)
+  | MatrixSpacer
+  | MatrixFilled
+
+toMatrix : HeightFunc n e -> Grid n e -> Matrix (MatrixCell n e)
+toMatrix nh grid =
+  toMatrix' nh 0 0 (Matrix.matrix (height nh grid) (width grid) (always MatrixSpacer)) grid
+
+toMatrix' : HeightFunc n e -> Int -> Int -> Matrix (MatrixCell n e) -> Grid n e -> Matrix (MatrixCell n e)
+toMatrix' nh row col matrix grid =
   case grid of
     End ->
       matrix
 
     Serial a b ->
-      toMatrix' row (col + width a) (toMatrix' row col matrix a) b
+      toMatrix' nh row (col + width a) (toMatrix' nh row col matrix a) b
       -- toCells' w a ++ toCells' w b
 
     Parallel grids ->
-      fst <| List.foldl (\g (m, row') -> (toMatrix' row' col m g, row' + height g)) (matrix, row) grids
+      fst <| List.foldl (\g (m, row') -> (toMatrix' nh row' col m g, row' + height nh g)) (matrix, row) grids
       -- List.concatMap (toCells' w) grids
 
     Cell nc ->
-      Matrix.set (Debug.log "insert" (row, col)) (Just nc) matrix
+      Matrix.set (row, col) (MatrixNode nc) (clearHeight row col (nh nc - 1) matrix)
+
+clearHeight : Int -> Int -> Int -> Matrix (MatrixCell n e) -> Matrix (MatrixCell n e)
+clearHeight row col height matrix =
+  if height == 0 then
+    matrix
+  else
+    clearHeight row col (height - 1) (Matrix.set (row + height, col) MatrixFilled matrix)
 
 width : Grid n e -> Int
 width grid =
@@ -51,20 +66,20 @@ width grid =
     Cell _ ->
       1
 
-height : Grid n e -> Int
-height grid =
+height : HeightFunc n e -> Grid n e -> Int
+height nh grid =
   case grid of
     End ->
       0
 
     Serial a b ->
-      max (height a) (height b)
+      max (height nh a) (height nh b)
 
     Parallel grids ->
-      List.sum (List.map height grids)
+      List.sum (List.map (height nh) grids)
 
-    Cell _ ->
-      1
+    Cell nc ->
+      nh nc
 
 insert : Graph.NodeContext n e -> Grid n e -> Grid n e
 insert nc grid =
