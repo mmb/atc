@@ -3,6 +3,7 @@ module Grid exposing (Grid(..), insert, fromGraph, MatrixCell(..), toMatrix)
 import Graph
 import IntDict
 import Matrix exposing (Matrix)
+import Set exposing (Set)
 import String
 
 type Grid n e
@@ -174,37 +175,50 @@ addAfterMixedUpstreamsAndReinsertExclusiveOnes nc dependent =
         Debug.crash "impossible"
 
       (Nothing, _) ->
-        Serial (Parallel (List.map Cell exclusives)) (Cell nc)
+        Serial (Parallel exclusives) (Cell nc)
 
       (Just rem, []) ->
         Serial (Parallel dependent) (Cell nc)
 
       (Just rem, _) ->
         List.foldr
-          addBeforeDownstream
+          checkAndAddBeforeDownstream
           (addAfterUpstreams nc rem)
           exclusives
 
-addBeforeDownstream : Graph.NodeContext n e -> Grid n e -> Grid n e
-addBeforeDownstream nc grid =
+checkAndAddBeforeDownstream : Grid n e -> Grid n e -> Grid n e
+checkAndAddBeforeDownstream up grid =
+  let
+    after =
+      addBeforeDownstream up grid
+  in
+    if after == grid then
+      Debug.crash ("failed to add: " ++ toString up)
+    else
+      after
+
+addBeforeDownstream : Grid n e -> Grid n e -> Grid n e
+addBeforeDownstream up grid =
   case grid of
     End ->
       End
 
     Parallel grids ->
-      if comesDirectlyFrom nc grid then
-        Serial (Cell nc) grid
+      if comesDirectlyFrom up grid then
+        Debug.crash "too late to add in front of Parallel"
       else
-        Parallel (List.map (addBeforeDownstream nc) grids)
+        Parallel (List.map (addBeforeDownstream up) grids)
 
     Serial a b ->
-      if comesDirectlyFrom nc b then
-        Serial (addToStart (Cell nc) a) b
+      if comesDirectlyFrom up a then
+        Debug.crash "too late to add in front of Serial"
+      else if comesDirectlyFrom up b then
+        Serial (addToStart up a) b
       else
-        Serial a (addBeforeDownstream nc b)
+        Serial a (addBeforeDownstream up b)
 
     Cell upstreamOrUnrelated ->
-      if comesDirectlyFrom nc grid then
+      if comesDirectlyFrom up grid then
         Debug.crash "too late to add in front of Cell"
       else
         grid
@@ -224,22 +238,52 @@ leadsTo nc grid =
     Cell upstreamOrUnrelated ->
       IntDict.member nc.node.id upstreamOrUnrelated.outgoing
 
-comesDirectlyFrom : Graph.NodeContext n e -> Grid n e -> Bool
-comesDirectlyFrom nc grid =
+comesDirectlyFrom : Grid n e -> Grid n e -> Bool
+comesDirectlyFrom up grid =
   case grid of
     End ->
       False
 
     Parallel grids ->
-      List.any (comesDirectlyFrom nc) grids
+      List.any (comesDirectlyFrom up) grids
 
     Serial a _ ->
-      comesDirectlyFrom nc a
+      comesDirectlyFrom up a
 
-    Cell upstreamOrUnrelated ->
-      IntDict.member nc.node.id upstreamOrUnrelated.incoming
+    Cell nc ->
+      Set.member nc.node.id (terminals up)
 
-extractExclusiveUpstreams : Graph.NodeContext n e -> Grid n e -> (Maybe (Grid n e), List (Graph.NodeContext n e))
+terminals : Grid n e -> Set Int
+terminals grid =
+  case grid of
+    End ->
+      Set.empty
+
+    Parallel grids ->
+      List.foldl (\g s -> Set.union s (terminals g)) Set.empty grids
+
+    Serial a b ->
+      Set.diff (Set.union (terminals a) (terminals b)) (nodes b)
+
+    Cell nc ->
+      Set.fromList (IntDict.keys nc.outgoing)
+
+nodes : Grid n e -> Set Int
+nodes grid =
+  case grid of
+    End ->
+      Set.empty
+
+    Parallel grids ->
+      List.foldl (\g s -> Set.union s (nodes g)) Set.empty grids
+
+    Serial a b ->
+      Set.union (nodes a) (nodes b)
+
+    Cell nc ->
+      Set.singleton nc.node.id
+
+extractExclusiveUpstreams : Graph.NodeContext n e -> Grid n e -> (Maybe (Grid n e), List (Grid n e))
 extractExclusiveUpstreams target grid =
   case grid of
     End ->
@@ -262,12 +306,17 @@ extractExclusiveUpstreams target grid =
           (Just (Parallel <| List.filterMap identity remainders), exclusives)
 
     Serial a b ->
-      -- in principle, if we can guarantee that this entire sequence ends
-      -- with the target, this could return the 'Serial a b' itself
-      (Just grid, [])
+      let
+        terms =
+          terminals grid
+      in
+        if Set.size terms == 1 && Set.member target.node.id terms then
+          (Nothing, [grid])
+        else
+          (Just grid, [])
 
     Cell source ->
       if IntDict.size source.outgoing == 1 && IntDict.member target.node.id source.outgoing then
-        (Nothing, [source])
+        (Nothing, [grid])
       else
         (Just grid, [])
