@@ -35,11 +35,9 @@ toMatrix' nh row col matrix grid =
 
     Serial a b ->
       toMatrix' nh row (col + width a) (toMatrix' nh row col matrix a) b
-      -- toCells' w a ++ toCells' w b
 
     Parallel grids ->
       fst <| List.foldl (\g (m, row') -> (toMatrix' nh row' col m g, row' + height nh g)) (matrix, row) grids
-      -- List.concatMap (toCells' w) grids
 
     Cell nc ->
       Matrix.set (row, col) (MatrixNode nc) (clearHeight row col (nh nc - 1) matrix)

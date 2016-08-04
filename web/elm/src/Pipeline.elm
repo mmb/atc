@@ -82,7 +82,9 @@ view model =
           |> Matrix.toList
           |> List.map viewRow
       )
-        -- viewGrid (Grid.fromGraph model.graph)
+      -- Html.div [class "pipeline-gird"] [
+      --   viewGrid (Grid.fromGraph model.graph)
+      -- ]
 
 nodeHeight : Graph.NodeContext Node () -> Int
 nodeHeight {node} =
@@ -96,16 +98,18 @@ nodeHeight {node} =
 viewRow : List (Grid.MatrixCell Node ()) -> Html Msg
 viewRow row =
   Html.tr [] <|
-    List.map viewGridNode row
+    List.map viewMatrixCell row
 
-viewGridNode : Grid.MatrixCell Node () -> Html Msg
-viewGridNode mnode =
+viewMatrixCell : Grid.MatrixCell Node () -> Html Msg
+viewMatrixCell mnode =
   case mnode of
     Grid.MatrixSpacer ->
       Html.td [class "spacer"] []
 
     Grid.MatrixNode node ->
-      viewGraphNode node
+      Html.td [rowspan (nodeHeight node)] [
+        viewGraphNode node
+      ]
 
     Grid.MatrixFilled ->
       Html.text ""
@@ -148,7 +152,7 @@ viewGraphRank ncs =
 
 viewGraphNode : Graph.NodeContext Node () -> Html Msg
 viewGraphNode nc =
-  Html.td [rowspan (nodeHeight nc), class "node", Html.Attributes.id ("node-" ++ toString nc.node.id)] [viewNode nc.node.label]
+  Html.div [class "node", Html.Attributes.id ("node-" ++ toString nc.node.id)] [viewNode nc.node.label]
 
 viewNode : Node -> Html Msg
 viewNode node =

@@ -1,3 +1,7 @@
+.node, .resource-node {
+  white-space: nowrap;
+}
+
 .node a {
   margin-bottom: 10px;
   display: inline-block;
@@ -25,7 +29,7 @@
 
 .pipeline-table {
   padding: 20px;
-  border-spacing: 50px 0;
+  border-spacing: 30px 0;
 
   tr {
     vertical-align: top;
@@ -33,53 +37,25 @@
 
   td {
     padding: 0;
-    white-space: nowrap;
   }
 }
 
 .node {
   // background: #0f0;
 }
+
 .spacer {
   height: 30px;
-  // background: #000;
 }
-// .pipeline-table {
-//   display: table;
-// }
 
-// .pipeline-table-row {
-//   display: table-row;
-// }
+.parallel-grid {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid red;
+}
 
-// .node, .spacer {
-//   display: table-cell;
-// }
-
-// .pipeline-grid {
-//   display: table;
-// }
-
-// .serial-grid {
-//   display: table-row;
-
-//   > * {
-//     display: table-cell;
-//   }
-// }
-
-// .parallel-grid {
-//   display: flex;
-//   flex-direction: row;
-//   border: 1px solid red;
-// }
-
-// .spacer {
-//   flex-grow: 1;
-// }
-
-// .serial-grid {
-//   display: flex;
-//   flex-direction: column;
-//   border: 1px solid green;
-// }
+.serial-grid {
+  display: flex;
+  flex-direction: row;
+  border: 1px solid green;
+}
