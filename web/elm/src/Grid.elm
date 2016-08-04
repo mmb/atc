@@ -3,6 +3,7 @@ module Grid exposing (Grid(..), insert, fromGraph, MatrixCell(..), toMatrix)
 import Graph
 import IntDict
 import Matrix exposing (Matrix)
+import String
 
 type Grid n e
   = Cell (Graph.NodeContext n e)
@@ -41,6 +42,25 @@ toMatrix' nh row col matrix grid =
 
     Cell nc ->
       Matrix.set (row, col) (MatrixNode nc) (clearHeight row col (nh nc - 1) matrix)
+
+showMatrix : Matrix (MatrixCell n e) -> String
+showMatrix m =
+  let
+    showCell c =
+      case c of
+        MatrixSpacer ->
+          "  "
+        MatrixFilled ->
+          "--"
+        MatrixNode nc ->
+          if nc.node.id < 10 then
+            " " ++ toString nc.node.id
+          else
+            toString nc.node.id
+  in
+    Matrix.toList m
+      |> List.map (\r -> String.join "|" (List.map showCell r))
+      |> String.join "\n"
 
 clearHeight : Int -> Int -> Int -> Matrix (MatrixCell n e) -> Matrix (MatrixCell n e)
 clearHeight row col height matrix =
