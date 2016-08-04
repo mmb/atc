@@ -8,7 +8,7 @@ import (
 	"github.com/concourse/atc/pipelines/pipelinesfakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/pivotal-golang/lager/lagertest"
+	"code.cloudfoundry.org/lager/lagertest"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/fake_runner"
 
@@ -48,9 +48,7 @@ var _ = Describe("Pipelines Syncer", func() {
 				return otherFakeRunner
 			default:
 				panic("unexpected pipelineDB input received")
-				return nil
 			}
-			return fakeRunner
 		}
 
 		pipelineDBFactory.BuildStub = func(pipeline db.SavedPipeline) db.PipelineDB {
@@ -63,7 +61,6 @@ var _ = Describe("Pipelines Syncer", func() {
 				return pipelineDB
 			default:
 				panic("unexpected pipeline input received")
-				return nil
 			}
 		}
 
@@ -229,21 +226,6 @@ var _ = Describe("Pipelines Syncer", func() {
 
 			signals, _ := fakeRunner.RunArgsForCall(0)
 			Eventually(signals).Should(Receive(Equal(os.Interrupt)))
-		})
-
-		It("resets all the pending build preparations", func() {
-			Expect(syncherDB.ResetBuildPreparationsWithPipelinePausedCallCount()).To(Equal(1))
-			Expect(syncherDB.ResetBuildPreparationsWithPipelinePausedArgsForCall(0)).To(Equal(pipelines[0].ID))
-		})
-
-		Context("on subsequent runs", func() {
-			JustBeforeEach(func() {
-				syncer.Sync()
-			})
-
-			It("does not send the signal again", func() {
-				Expect(syncherDB.ResetBuildPreparationsWithPipelinePausedCallCount()).To(Equal(1))
-			})
 		})
 	})
 

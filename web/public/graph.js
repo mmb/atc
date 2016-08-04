@@ -568,48 +568,30 @@ RankGroup.prototype.width = function() {
 RankGroup.prototype.layout = function() {
   var rollingKeyOffset = 0;
 
+  this.ordering = new Ordering();
+
   for (var i in this.nodes) {
     var node = this.nodes[i];
 
     node._keyOffset = rollingKeyOffset;
 
+    this.ordering.fill(rollingKeyOffset, node._edgeKeys.length);
+
     rollingKeyOffset += Math.max(node._edgeKeys.length, 1);
   }
-
-  this.setOrdering();
 }
 
-RankGroup.prototype.setOrdering = function() {
-  this.ordering = new Ordering();
-
-  for (var i in this.nodes) {
-    var node = this.nodes[i];
-    this.ordering.fill(node._keyOffset, node._edgeKeys.length);
-  }
-}
-
-RankGroup.prototype.fillGaps = function() {
+RankGroup.prototype.tug = function() {
   var changed = false;
 
-  this.setOrdering();
-
-  for (var i = 0; i < this.nodes.length; i++) {
+  for (var i = this.nodes.length - 1; i >= 0; i--) {
     var node = this.nodes[i];
 
-    if (node._inEdges.length !== 0 || node._edgeKeys.length > 1) {
-      continue;
-    }
-
-    var align = node.outAlignment();
-    if (align === undefined) {
-      continue;
-    }
-
-    if (this.ordering.isFree(align, node._edgeKeys.length)) {
+    var align = node.inAlignment();
+    if (align !== undefined && node._keyOffset < align && this.ordering.isFree(align, node._edgeKeys.length)) {
       this.ordering.free(node._keyOffset, node._edgeKeys.length);
       node._keyOffset = align;
       this.ordering.fill(node._keyOffset, node._edgeKeys.length);
-
       changed = true;
     }
   }
@@ -941,12 +923,7 @@ Node.prototype.outGroupAlignment = function() {
 }
 
 Node.prototype.inAlignment = function() {
-  return this.edgeAlignment("_inEdges", "source");
-};
-
-Node.prototype.outAlignment = function() {
-  return this.edgeAlignment("_outEdges", "target");
-}
+  var minAlignment;
 
 Node.prototype.edgeGroupAlignment = function(direction, end, oppositeDirection, oppositeEnd) {
   // the lowest node out of the highest node of each rank following the edges
@@ -1014,21 +991,19 @@ Node.prototype.edgeAlignment = function(direction, end) {
       // going to a node with more than one key
       interestingness++;
     }
+  }
 
-    if (this._edgeKeys.indexOf(edge.key) === 0) {
-      // prefer aligning with the top of the current node
-      interestingness++;
-    }
+  return minAlignment;
+};
 
-    if (interestingness !== undefined && interestingness < alignmentInterestingness) {
-      // boring; don't align with it
-      continue;
-    }
+Node.prototype.outAlignment = function() {
+  var minAlignment;
 
-    if (minAlignment === undefined || interestingness > alignmentInterestingness || alignment < minAlignment) {
-      // more interesting, or equally interesting but places the node higher
-      minAlignment = alignment;
-      alignmentInterestingness = interestingness;
+  for (var e in this._outEdges) {
+    var edge = this._outEdges[e];
+    var offset = edge.target.effectiveKeyOffset();
+    if (minAlignment === undefined || offset < minAlignment) {
+      minAlignment = offset - this._edgeKeys.indexOf(edge.key);
     }
   }
 

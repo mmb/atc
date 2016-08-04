@@ -14,8 +14,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/cloudfoundry-incubator/garden"
-	gfakes "github.com/cloudfoundry-incubator/garden/fakes"
+	"code.cloudfoundry.org/garden"
+	gfakes "code.cloudfoundry.org/garden/gardenfakes"
 	"github.com/gorilla/websocket"
 
 	"github.com/concourse/atc"

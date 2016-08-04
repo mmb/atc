@@ -10,7 +10,7 @@ import (
 	"github.com/concourse/atc"
 	"github.com/concourse/atc/event"
 	"github.com/lib/pq"
-	"github.com/pivotal-golang/lager"
+	"code.cloudfoundry.org/lager"
 )
 
 //go:generate counterfeiter . Conn
@@ -86,9 +86,6 @@ type DB interface {
 
 	CreatePipe(pipeGUID string, url string) error
 	GetPipe(pipeGUID string) (Pipe, error)
-
-	UpdateBuildPreparation(buildPreparation BuildPreparation) error
-	ResetBuildPreparationsWithPipelinePaused(pipelineID int) error
 
 	GetLease(logger lager.Logger, taskName string, interval time.Duration) (Lease, bool, error)
 

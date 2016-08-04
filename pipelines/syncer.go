@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/concourse/atc/db"
-	"github.com/pivotal-golang/lager"
+	"code.cloudfoundry.org/lager"
 	"github.com/tedsuo/ifrit"
 )
 
@@ -12,7 +12,6 @@ import (
 
 type SyncherDB interface {
 	GetAllPipelines() ([]db.SavedPipeline, error)
-	ResetBuildPreparationsWithPipelinePaused(pipelineID int) error
 }
 
 type PipelineRunnerFactory func(db.PipelineDB) ifrit.Runner
@@ -81,11 +80,6 @@ func (syncer *Syncer) Sync() {
 			syncer.logger.Debug("stopping-pipeline", lager.Data{"pipeline-id": id})
 			runningPipeline.Process.Signal(os.Interrupt)
 			syncer.removePipeline(id)
-
-			err := syncer.syncherDB.ResetBuildPreparationsWithPipelinePaused(id)
-			if err != nil {
-				syncer.logger.Error("updating-build-preps-stopping-pipeline", err, lager.Data{"pipeline-id": id})
-			}
 		}
 	}
 
