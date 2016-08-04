@@ -1,53 +1,18 @@
 {{define "title"}}{{.PipelineName}} - Concourse{{end}}
 
 {{define "body"}}
-<div id="pipeline">
-  <dl class="legend">
-    <dt class="pending"></dt>
-      <dd>pending</dd>
-    <dt class="started"></dt>
-      <dd>started</dd>
-    <dt class="succeeded"></dt>
-      <dd>succeeded</dd>
-    <dt class="failed"></dt>
-      <dd>failed</dd>
-    <dt class="errored"></dt>
-      <dd>errored</dd>
-    <dt class="aborted"></dt>
-      <dd>aborted</dd>
-    <dt class="paused"></dt>
-      <dd>paused</dd>
-  </dl>
-</div>
-
-<table class="lower-right-info">
-  <tr>
-    <td class="label">cli:</td>
-    <td>
-      <ul class="cli-downloads">
-        <li><a href="{{url "DownloadCLI" "darwin" "amd64"}}" aria-label="Download OS X CLI"><i class="fa fa-apple"></i></a></li>
-        <li><a href="{{url "DownloadCLI" "windows" "amd64"}}" aria-label="Download Windows CLI"><i class="fa fa-windows"></i></a></li>
-        <li><a href="{{url "DownloadCLI" "linux" "amd64"}}" aria-label="Download Linux CLI"><i class="fa fa-linux"></i></a></li>
-      </ul>
-    </td>
-  </tr>
-  <tr>
-    <td class="label">version:</td>
-    <td><div id="concourse-version">v<span class="number"></span></div></td>
-  </tr>
-</table>
+<div id="elm-app"></div>
 
 <script src="{{asset "jquery-2.1.1.min.js"}}"></script>
-<script src="{{asset "d3.v355.min.js"}}"></script>
-<script src="{{asset "graph.js"}}"></script>
 <script src="{{asset "concourse.js"}}"></script>
-<script src="{{asset "index.js"}}"></script>
+<script src="{{asset "elm.min.js"}}"></script>
+<script type="text/javascript">
+concourse.pipelineName = "{{.PipelineName}}"; // used for detecting if the pipeline is paused
 
-<script>
-concourse.pipelineName = {{.PipelineName}};
-concourse.teamName = {{.TeamName}};
-$(document).ready(function() {
-  renderPipeline({{.Groups}});
-})
+var node = document.getElementById("elm-app");
+Elm.PipelinePage.embed(node, {
+  teamName: {{.TeamName}},
+  pipelineName: {{.PipelineName}}
+});
 </script>
 {{end}}
