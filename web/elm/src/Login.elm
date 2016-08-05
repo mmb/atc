@@ -32,6 +32,7 @@ type alias TeamSelectionModel =
 type alias LoginModel =
   { teamName : String
   , authMethods : Maybe (List AuthMethod)
+  , hasTeamSelectionInBrowserHistory : Bool
   }
 
 type Action
@@ -40,6 +41,7 @@ type Action
   | TeamsFetched (Result Http.Error (List Team))
   | SelectTeam String
   | AuthFetched (Result Http.Error (List AuthMethod))
+  | GoBack
 
 defaultPage : PageWithRedirect
 defaultPage = { page = TeamSelectionPage, redirect = "" }
@@ -62,6 +64,7 @@ init pageResult =
         ( Login
             { teamName = teamName
             , authMethods = Nothing
+            , hasTeamSelectionInBrowserHistory = False
             }
         , Cmd.map
             AuthFetched <|
@@ -88,6 +91,7 @@ urlUpdate pageResult model =
         ( Login
             { teamName = teamName
             , authMethods = Nothing
+            , hasTeamSelectionInBrowserHistory = True
             }
         , Cmd.map
             AuthFetched <|
@@ -136,6 +140,13 @@ update action model =
     AuthFetched (Err err) ->
       Debug.log ("failed to fetch auth methods: " ++ toString err) <|
         (model, Cmd.none)
+    GoBack ->
+      case model of
+        Login loginModel ->
+          case loginModel.hasTeamSelectionInBrowserHistory of
+            True -> (model, Navigation.back 1 )
+            False -> (model, Navigation.newUrl "/login" )
+        TeamSelection _ -> (model, Cmd.none)
 
 loginRoute : String -> String -> String
 loginRoute redirect teamName =
@@ -245,11 +256,20 @@ teamNameStartsWithSensitive : String -> Team -> Bool
 teamNameStartsWithSensitive substring team =
   String.startsWith substring team.name
 
-viewLogin : LoginModel -> Html action
+viewLogin : LoginModel -> Html Action
 viewLogin model =
   Html.div
     [ class "centered-contents" ]
-    [ Html.div [ class "small-title" ] []
+    [ Html.div
+        [ class "small-title" ]
+        [ Html.a
+            [ onClickPreventDefault GoBack
+            , Attributes.href "/login"
+            ]
+            [ Html.i [class "fa fa-fw fa-chevron-left"] []
+            , Html.text "back to team selection"
+            ]
+        ]
     , Html.div
         [ class "login-box auth-methods" ] <|
         [ Html.div

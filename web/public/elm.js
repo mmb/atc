@@ -17107,6 +17107,156 @@ var _concourse$atc$Login$viewLoading = A2(
 				[])),
 			_elm_lang$html$Html$text('Loading...')
 		]));
+var _concourse$atc$Login$loginRoute = F2(
+	function (redirect, teamName) {
+		return A2(
+			_elm_lang$core$Basics_ops['++'],
+			'teams/',
+			A2(
+				_elm_lang$core$Basics_ops['++'],
+				teamName,
+				A2(
+					_elm_lang$core$Basics_ops['++'],
+					'/login',
+					function () {
+						var _p5 = redirect;
+						if (_p5 === '') {
+							return '';
+						} else {
+							return A2(_elm_lang$core$Basics_ops['++'], '?redirect=', redirect);
+						}
+					}())));
+	});
+var _concourse$atc$Login$PageWithRedirect = F2(
+	function (a, b) {
+		return {page: a, redirect: b};
+	});
+var _concourse$atc$Login$TeamSelectionModel = F3(
+	function (a, b, c) {
+		return {teamFilter: a, teams: b, redirect: c};
+	});
+var _concourse$atc$Login$LoginModel = F3(
+	function (a, b, c) {
+		return {teamName: a, authMethods: b, hasTeamSelectionInBrowserHistory: c};
+	});
+var _concourse$atc$Login$LoginPage = function (a) {
+	return {ctor: 'LoginPage', _0: a};
+};
+var _concourse$atc$Login$TeamSelectionPage = {ctor: 'TeamSelectionPage'};
+var _concourse$atc$Login$defaultPage = {page: _concourse$atc$Login$TeamSelectionPage, redirect: ''};
+var _concourse$atc$Login$Login = function (a) {
+	return {ctor: 'Login', _0: a};
+};
+var _concourse$atc$Login$TeamSelection = function (a) {
+	return {ctor: 'TeamSelection', _0: a};
+};
+var _concourse$atc$Login$update = F2(
+	function (action, model) {
+		var _p6 = action;
+		switch (_p6.ctor) {
+			case 'Noop':
+				return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+			case 'FilterTeams':
+				var _p7 = model;
+				if (_p7.ctor === 'TeamSelection') {
+					return {
+						ctor: '_Tuple2',
+						_0: _concourse$atc$Login$TeamSelection(
+							_elm_lang$core$Native_Utils.update(
+								_p7._0,
+								{teamFilter: _p6._0})),
+						_1: _elm_lang$core$Platform_Cmd$none
+					};
+				} else {
+					return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+				}
+			case 'TeamsFetched':
+				if (_p6._0.ctor === 'Ok') {
+					var _p8 = model;
+					if (_p8.ctor === 'TeamSelection') {
+						return {
+							ctor: '_Tuple2',
+							_0: _concourse$atc$Login$TeamSelection(
+								_elm_lang$core$Native_Utils.update(
+									_p8._0,
+									{
+										teams: _elm_lang$core$Maybe$Just(_p6._0._0)
+									})),
+							_1: _elm_lang$core$Platform_Cmd$none
+						};
+					} else {
+						return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+					}
+				} else {
+					return A2(
+						_elm_lang$core$Debug$log,
+						A2(
+							_elm_lang$core$Basics_ops['++'],
+							'failed to fetch teams: ',
+							_elm_lang$core$Basics$toString(_p6._0._0)),
+						{ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none});
+				}
+			case 'SelectTeam':
+				var _p9 = model;
+				if (_p9.ctor === 'TeamSelection') {
+					return {
+						ctor: '_Tuple2',
+						_0: model,
+						_1: _elm_lang$navigation$Navigation$newUrl(
+							A2(_concourse$atc$Login$loginRoute, _p9._0.redirect, _p6._0))
+					};
+				} else {
+					return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+				}
+			case 'AuthFetched':
+				if (_p6._0.ctor === 'Ok') {
+					var _p10 = model;
+					if (_p10.ctor === 'Login') {
+						return {
+							ctor: '_Tuple2',
+							_0: _concourse$atc$Login$Login(
+								_elm_lang$core$Native_Utils.update(
+									_p10._0,
+									{
+										authMethods: _elm_lang$core$Maybe$Just(_p6._0._0)
+									})),
+							_1: _elm_lang$core$Platform_Cmd$none
+						};
+					} else {
+						return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+					}
+				} else {
+					return A2(
+						_elm_lang$core$Debug$log,
+						A2(
+							_elm_lang$core$Basics_ops['++'],
+							'failed to fetch auth methods: ',
+							_elm_lang$core$Basics$toString(_p6._0._0)),
+						{ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none});
+				}
+			default:
+				var _p11 = model;
+				if (_p11.ctor === 'Login') {
+					var _p12 = _p11._0.hasTeamSelectionInBrowserHistory;
+					if (_p12 === true) {
+						return {
+							ctor: '_Tuple2',
+							_0: model,
+							_1: _elm_lang$navigation$Navigation$back(1)
+						};
+					} else {
+						return {
+							ctor: '_Tuple2',
+							_0: model,
+							_1: _elm_lang$navigation$Navigation$newUrl('/login')
+						};
+					}
+				} else {
+					return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+				}
+		}
+	});
+var _concourse$atc$Login$GoBack = {ctor: 'GoBack'};
 var _concourse$atc$Login$viewLogin = function (model) {
 	return A2(
 		_elm_lang$html$Html$div,
@@ -17123,7 +17273,27 @@ var _concourse$atc$Login$viewLogin = function (model) {
 						_elm_lang$html$Html_Attributes$class('small-title')
 					]),
 				_elm_lang$core$Native_List.fromArray(
-					[])),
+					[
+						A2(
+						_elm_lang$html$Html$a,
+						_elm_lang$core$Native_List.fromArray(
+							[
+								_concourse$atc$Login$onClickPreventDefault(_concourse$atc$Login$GoBack),
+								_elm_lang$html$Html_Attributes$href('/login')
+							]),
+						_elm_lang$core$Native_List.fromArray(
+							[
+								A2(
+								_elm_lang$html$Html$i,
+								_elm_lang$core$Native_List.fromArray(
+									[
+										_elm_lang$html$Html_Attributes$class('fa fa-fw fa-chevron-left')
+									]),
+								_elm_lang$core$Native_List.fromArray(
+									[])),
+								_elm_lang$html$Html$text('back to team selection')
+							]))
+					])),
 				A2(
 				_elm_lang$html$Html$div,
 				_elm_lang$core$Native_List.fromArray(
@@ -17156,29 +17326,29 @@ var _concourse$atc$Login$viewLogin = function (model) {
 								]))
 						]),
 					function () {
-						var _p5 = model.authMethods;
-						if (_p5.ctor === 'Nothing') {
+						var _p13 = model.authMethods;
+						if (_p13.ctor === 'Nothing') {
 							return _elm_lang$core$Native_List.fromArray(
 								[_concourse$atc$Login$viewLoading]);
 						} else {
-							var _p7 = _p5._0;
-							var _p6 = {
+							var _p15 = _p13._0;
+							var _p14 = {
 								ctor: '_Tuple2',
-								_0: _concourse$atc$Login$viewBasicAuthForm(_p7),
-								_1: _concourse$atc$Login$viewOAuthButtons(_p7)
+								_0: _concourse$atc$Login$viewBasicAuthForm(_p15),
+								_1: _concourse$atc$Login$viewOAuthButtons(_p15)
 							};
-							if (_p6._0.ctor === 'Just') {
-								if (_p6._1.ctor === 'Just') {
+							if (_p14._0.ctor === 'Just') {
+								if (_p14._1.ctor === 'Just') {
 									return _elm_lang$core$Native_List.fromArray(
-										[_p6._1._0, _concourse$atc$Login$viewOrBar, _p6._0._0]);
+										[_p14._1._0, _concourse$atc$Login$viewOrBar, _p14._0._0]);
 								} else {
 									return _elm_lang$core$Native_List.fromArray(
-										[_p6._0._0]);
+										[_p14._0._0]);
 								}
 							} else {
-								if (_p6._1.ctor === 'Just') {
+								if (_p14._1.ctor === 'Just') {
 									return _elm_lang$core$Native_List.fromArray(
-										[_p6._1._0]);
+										[_p14._1._0]);
 								} else {
 									return _elm_lang$core$Native_List.fromArray(
 										[_concourse$atc$Login$viewNoAuthButton]);
@@ -17188,135 +17358,6 @@ var _concourse$atc$Login$viewLogin = function (model) {
 					}()))
 			]));
 };
-var _concourse$atc$Login$loginRoute = F2(
-	function (redirect, teamName) {
-		return A2(
-			_elm_lang$core$Basics_ops['++'],
-			'teams/',
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				teamName,
-				A2(
-					_elm_lang$core$Basics_ops['++'],
-					'/login',
-					function () {
-						var _p8 = redirect;
-						if (_p8 === '') {
-							return '';
-						} else {
-							return A2(_elm_lang$core$Basics_ops['++'], '?redirect=', redirect);
-						}
-					}())));
-	});
-var _concourse$atc$Login$PageWithRedirect = F2(
-	function (a, b) {
-		return {page: a, redirect: b};
-	});
-var _concourse$atc$Login$TeamSelectionModel = F3(
-	function (a, b, c) {
-		return {teamFilter: a, teams: b, redirect: c};
-	});
-var _concourse$atc$Login$LoginModel = F2(
-	function (a, b) {
-		return {teamName: a, authMethods: b};
-	});
-var _concourse$atc$Login$LoginPage = function (a) {
-	return {ctor: 'LoginPage', _0: a};
-};
-var _concourse$atc$Login$TeamSelectionPage = {ctor: 'TeamSelectionPage'};
-var _concourse$atc$Login$defaultPage = {page: _concourse$atc$Login$TeamSelectionPage, redirect: ''};
-var _concourse$atc$Login$Login = function (a) {
-	return {ctor: 'Login', _0: a};
-};
-var _concourse$atc$Login$TeamSelection = function (a) {
-	return {ctor: 'TeamSelection', _0: a};
-};
-var _concourse$atc$Login$update = F2(
-	function (action, model) {
-		var _p9 = action;
-		switch (_p9.ctor) {
-			case 'Noop':
-				return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
-			case 'FilterTeams':
-				var _p10 = model;
-				if (_p10.ctor === 'TeamSelection') {
-					return {
-						ctor: '_Tuple2',
-						_0: _concourse$atc$Login$TeamSelection(
-							_elm_lang$core$Native_Utils.update(
-								_p10._0,
-								{teamFilter: _p9._0})),
-						_1: _elm_lang$core$Platform_Cmd$none
-					};
-				} else {
-					return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
-				}
-			case 'TeamsFetched':
-				if (_p9._0.ctor === 'Ok') {
-					var _p11 = model;
-					if (_p11.ctor === 'TeamSelection') {
-						return {
-							ctor: '_Tuple2',
-							_0: _concourse$atc$Login$TeamSelection(
-								_elm_lang$core$Native_Utils.update(
-									_p11._0,
-									{
-										teams: _elm_lang$core$Maybe$Just(_p9._0._0)
-									})),
-							_1: _elm_lang$core$Platform_Cmd$none
-						};
-					} else {
-						return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
-					}
-				} else {
-					return A2(
-						_elm_lang$core$Debug$log,
-						A2(
-							_elm_lang$core$Basics_ops['++'],
-							'failed to fetch teams: ',
-							_elm_lang$core$Basics$toString(_p9._0._0)),
-						{ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none});
-				}
-			case 'SelectTeam':
-				var _p12 = model;
-				if (_p12.ctor === 'TeamSelection') {
-					return {
-						ctor: '_Tuple2',
-						_0: model,
-						_1: _elm_lang$navigation$Navigation$newUrl(
-							A2(_concourse$atc$Login$loginRoute, _p12._0.redirect, _p9._0))
-					};
-				} else {
-					return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
-				}
-			default:
-				if (_p9._0.ctor === 'Ok') {
-					var _p13 = model;
-					if (_p13.ctor === 'Login') {
-						return {
-							ctor: '_Tuple2',
-							_0: _concourse$atc$Login$Login(
-								_elm_lang$core$Native_Utils.update(
-									_p13._0,
-									{
-										authMethods: _elm_lang$core$Maybe$Just(_p9._0._0)
-									})),
-							_1: _elm_lang$core$Platform_Cmd$none
-						};
-					} else {
-						return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
-					}
-				} else {
-					return A2(
-						_elm_lang$core$Debug$log,
-						A2(
-							_elm_lang$core$Basics_ops['++'],
-							'failed to fetch auth methods: ',
-							_elm_lang$core$Basics$toString(_p9._0._0)),
-						{ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none});
-				}
-		}
-	});
 var _concourse$atc$Login$AuthFetched = function (a) {
 	return {ctor: 'AuthFetched', _0: a};
 };
@@ -17344,8 +17385,8 @@ var _concourse$atc$Login$TeamsFetched = function (a) {
 };
 var _concourse$atc$Login$init = function (pageResult) {
 	var pageWithRedirect = A2(_elm_lang$core$Result$withDefault, _concourse$atc$Login$defaultPage, pageResult);
-	var _p14 = pageWithRedirect.page;
-	if (_p14.ctor === 'TeamSelectionPage') {
+	var _p16 = pageWithRedirect.page;
+	if (_p16.ctor === 'TeamSelectionPage') {
 		return {
 			ctor: '_Tuple2',
 			_0: _concourse$atc$Login$TeamSelection(
@@ -17356,11 +17397,11 @@ var _concourse$atc$Login$init = function (pageResult) {
 				A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _concourse$atc$Concourse_Team$fetchTeams))
 		};
 	} else {
-		var _p15 = _p14._0;
+		var _p17 = _p16._0;
 		return {
 			ctor: '_Tuple2',
 			_0: _concourse$atc$Login$Login(
-				{teamName: _p15, authMethods: _elm_lang$core$Maybe$Nothing}),
+				{teamName: _p17, authMethods: _elm_lang$core$Maybe$Nothing, hasTeamSelectionInBrowserHistory: false}),
 			_1: A2(
 				_elm_lang$core$Platform_Cmd$map,
 				_concourse$atc$Login$AuthFetched,
@@ -17368,15 +17409,15 @@ var _concourse$atc$Login$init = function (pageResult) {
 					_elm_lang$core$Task$perform,
 					_elm_lang$core$Result$Err,
 					_elm_lang$core$Result$Ok,
-					_concourse$atc$Concourse_AuthMethod$fetchAuthMethods(_p15)))
+					_concourse$atc$Concourse_AuthMethod$fetchAuthMethods(_p17)))
 		};
 	}
 };
 var _concourse$atc$Login$urlUpdate = F2(
 	function (pageResult, model) {
 		var pageWithRedirect = A2(_elm_lang$core$Result$withDefault, _concourse$atc$Login$defaultPage, pageResult);
-		var _p16 = pageWithRedirect.page;
-		if (_p16.ctor === 'TeamSelectionPage') {
+		var _p18 = pageWithRedirect.page;
+		if (_p18.ctor === 'TeamSelectionPage') {
 			return {
 				ctor: '_Tuple2',
 				_0: _concourse$atc$Login$TeamSelection(
@@ -17387,11 +17428,11 @@ var _concourse$atc$Login$urlUpdate = F2(
 					A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _concourse$atc$Concourse_Team$fetchTeams))
 			};
 		} else {
-			var _p17 = _p16._0;
+			var _p19 = _p18._0;
 			return {
 				ctor: '_Tuple2',
 				_0: _concourse$atc$Login$Login(
-					{teamName: _p17, authMethods: _elm_lang$core$Maybe$Nothing}),
+					{teamName: _p19, authMethods: _elm_lang$core$Maybe$Nothing, hasTeamSelectionInBrowserHistory: true}),
 				_1: A2(
 					_elm_lang$core$Platform_Cmd$map,
 					_concourse$atc$Login$AuthFetched,
@@ -17399,7 +17440,7 @@ var _concourse$atc$Login$urlUpdate = F2(
 						_elm_lang$core$Task$perform,
 						_elm_lang$core$Result$Err,
 						_elm_lang$core$Result$Ok,
-						_concourse$atc$Concourse_AuthMethod$fetchAuthMethods(_p17)))
+						_concourse$atc$Concourse_AuthMethod$fetchAuthMethods(_p19)))
 			};
 		}
 	});
@@ -17448,18 +17489,18 @@ var _concourse$atc$Login$viewTeamSelection = function (model) {
 							[
 								_elm_lang$html$Html_Events$onSubmit(
 								function () {
-									var _p18 = {
+									var _p20 = {
 										ctor: '_Tuple2',
 										_0: _elm_lang$core$List$head(filteredTeams),
 										_1: model.teamFilter
 									};
-									if (_p18._0.ctor === 'Nothing') {
+									if (_p20._0.ctor === 'Nothing') {
 										return _concourse$atc$Login$Noop;
 									} else {
-										if (_p18._1 === '') {
+										if (_p20._1 === '') {
 											return _concourse$atc$Login$Noop;
 										} else {
-											return _concourse$atc$Login$SelectTeam(_p18._0._0.name);
+											return _concourse$atc$Login$SelectTeam(_p20._0._0.name);
 										}
 									}
 								}()),
@@ -17487,8 +17528,8 @@ var _concourse$atc$Login$viewTeamSelection = function (model) {
 									[]))
 							])),
 						function () {
-						var _p19 = model.teams;
-						if (_p19.ctor === 'Nothing') {
+						var _p21 = model.teams;
+						if (_p21.ctor === 'Nothing') {
 							return _concourse$atc$Login$viewLoading;
 						} else {
 							return A2(
@@ -17505,11 +17546,11 @@ var _concourse$atc$Login$viewTeamSelection = function (model) {
 			]));
 };
 var _concourse$atc$Login$view = function (model) {
-	var _p20 = model;
-	if (_p20.ctor === 'TeamSelection') {
-		return _concourse$atc$Login$viewTeamSelection(_p20._0);
+	var _p22 = model;
+	if (_p22.ctor === 'TeamSelection') {
+		return _concourse$atc$Login$viewTeamSelection(_p22._0);
 	} else {
-		return _concourse$atc$Login$viewLogin(_p20._0);
+		return _concourse$atc$Login$viewLogin(_p22._0);
 	}
 };
 
