@@ -1518,124 +1518,22 @@ var _elm_lang$core$List$intersperse = F2(
 			return A2(_elm_lang$core$List_ops['::'], _p21._0, spersed);
 		}
 	});
-var _elm_lang$core$List$takeReverse = F3(
-	function (n, list, taken) {
-		takeReverse:
-		while (true) {
-			if (_elm_lang$core$Native_Utils.cmp(n, 0) < 1) {
-				return taken;
-			} else {
-				var _p22 = list;
-				if (_p22.ctor === '[]') {
-					return taken;
-				} else {
-					var _v23 = n - 1,
-						_v24 = _p22._1,
-						_v25 = A2(_elm_lang$core$List_ops['::'], _p22._0, taken);
-					n = _v23;
-					list = _v24;
-					taken = _v25;
-					continue takeReverse;
-				}
-			}
-		}
-	});
-var _elm_lang$core$List$takeTailRec = F2(
+var _elm_lang$core$List$take = F2(
 	function (n, list) {
-		return _elm_lang$core$List$reverse(
-			A3(
-				_elm_lang$core$List$takeReverse,
-				n,
-				list,
-				_elm_lang$core$Native_List.fromArray(
-					[])));
-	});
-var _elm_lang$core$List$takeFast = F3(
-	function (ctr, n, list) {
 		if (_elm_lang$core$Native_Utils.cmp(n, 0) < 1) {
 			return _elm_lang$core$Native_List.fromArray(
 				[]);
 		} else {
-			var _p23 = {ctor: '_Tuple2', _0: n, _1: list};
-			_v26_5:
-			do {
-				_v26_1:
-				do {
-					if (_p23.ctor === '_Tuple2') {
-						if (_p23._1.ctor === '[]') {
-							return list;
-						} else {
-							if (_p23._1._1.ctor === '::') {
-								switch (_p23._0) {
-									case 1:
-										break _v26_1;
-									case 2:
-										return _elm_lang$core$Native_List.fromArray(
-											[_p23._1._0, _p23._1._1._0]);
-									case 3:
-										if (_p23._1._1._1.ctor === '::') {
-											return _elm_lang$core$Native_List.fromArray(
-												[_p23._1._0, _p23._1._1._0, _p23._1._1._1._0]);
-										} else {
-											break _v26_5;
-										}
-									default:
-										if ((_p23._1._1._1.ctor === '::') && (_p23._1._1._1._1.ctor === '::')) {
-											var _p28 = _p23._1._1._1._0;
-											var _p27 = _p23._1._1._0;
-											var _p26 = _p23._1._0;
-											var _p25 = _p23._1._1._1._1._0;
-											var _p24 = _p23._1._1._1._1._1;
-											return (_elm_lang$core$Native_Utils.cmp(ctr, 1000) > 0) ? A2(
-												_elm_lang$core$List_ops['::'],
-												_p26,
-												A2(
-													_elm_lang$core$List_ops['::'],
-													_p27,
-													A2(
-														_elm_lang$core$List_ops['::'],
-														_p28,
-														A2(
-															_elm_lang$core$List_ops['::'],
-															_p25,
-															A2(_elm_lang$core$List$takeTailRec, n - 4, _p24))))) : A2(
-												_elm_lang$core$List_ops['::'],
-												_p26,
-												A2(
-													_elm_lang$core$List_ops['::'],
-													_p27,
-													A2(
-														_elm_lang$core$List_ops['::'],
-														_p28,
-														A2(
-															_elm_lang$core$List_ops['::'],
-															_p25,
-															A3(_elm_lang$core$List$takeFast, ctr + 1, n - 4, _p24)))));
-										} else {
-											break _v26_5;
-										}
-								}
-							} else {
-								if (_p23._0 === 1) {
-									break _v26_1;
-								} else {
-									break _v26_5;
-								}
-							}
-						}
-					} else {
-						break _v26_5;
-					}
-				} while(false);
-				return _elm_lang$core$Native_List.fromArray(
-					[_p23._1._0]);
-			} while(false);
-			return list;
+			var _p22 = list;
+			if (_p22.ctor === '[]') {
+				return list;
+			} else {
+				return A2(
+					_elm_lang$core$List_ops['::'],
+					_p22._0,
+					A2(_elm_lang$core$List$take, n - 1, _p22._1));
+			}
 		}
-	});
-var _elm_lang$core$List$take = F2(
-	function (n, list) {
-		return A3(_elm_lang$core$List$takeFast, 0, n, list);
 	});
 var _elm_lang$core$List$repeatHelp = F3(
 	function (result, n, value) {
@@ -1644,12 +1542,12 @@ var _elm_lang$core$List$repeatHelp = F3(
 			if (_elm_lang$core$Native_Utils.cmp(n, 0) < 1) {
 				return result;
 			} else {
-				var _v27 = A2(_elm_lang$core$List_ops['::'], value, result),
-					_v28 = n - 1,
-					_v29 = value;
-				result = _v27;
-				n = _v28;
-				value = _v29;
+				var _v23 = A2(_elm_lang$core$List_ops['::'], value, result),
+					_v24 = n - 1,
+					_v25 = value;
+				result = _v23;
+				n = _v24;
+				value = _v25;
 				continue repeatHelp;
 			}
 		}
@@ -2632,10 +2530,7 @@ function work()
 	var process;
 	while (numSteps < MAX_STEPS && (process = workQueue.shift()))
 	{
-		if (process.root)
-		{
-			numSteps = step(numSteps, process);
-		}
+		numSteps = step(numSteps, process);
 	}
 	if (!process)
 	{
@@ -3908,21 +3803,13 @@ function endsWith(sub, str)
 function indexes(sub, str)
 {
 	var subLen = sub.length;
-	
-	if (subLen < 1)
-	{
-		return _elm_lang$core$Native_List.Nil;
-	}
-
 	var i = 0;
 	var is = [];
-
 	while ((i = str.indexOf(sub, i)) > -1)
 	{
 		is.push(i);
 		i = i + subLen;
-	}	
-	
+	}
 	return _elm_lang$core$Native_List.fromArray(is);
 }
 
@@ -4051,7 +3938,6 @@ return {
 };
 
 }();
-
 //import Native.Utils //
 
 var _elm_lang$core$Native_Char = function() {
@@ -5323,7 +5209,7 @@ function badToString(problem)
 					+ ':\n\n' + problems.join('\n');
 
 			case 'custom':
-				return 'A `customDecoder` failed'
+				return 'A `customDecode` failed'
 					+ (context === '_' ? '' : ' at ' + context)
 					+ ' with the message: ' + problem.msg;
 
@@ -15883,6 +15769,74 @@ var _concourse$atc$BuildPage$main = {
 		})
 };
 
+var _concourse$atc$Concourse_AuthMethod$OAuthAuthMethod = F2(
+	function (a, b) {
+		return {displayName: a, authURL: b};
+	});
+var _concourse$atc$Concourse_AuthMethod$OAuthMethod = function (a) {
+	return {ctor: 'OAuthMethod', _0: a};
+};
+var _concourse$atc$Concourse_AuthMethod$BasicMethod = {ctor: 'BasicMethod'};
+var _concourse$atc$Concourse_AuthMethod$authMethodFromTuple = function (tuple) {
+	var _p0 = tuple;
+	_v0_3:
+	do {
+		if (_p0.ctor === '_Tuple3') {
+			switch (_p0._0) {
+				case 'basic':
+					return _elm_lang$core$Result$Ok(_concourse$atc$Concourse_AuthMethod$BasicMethod);
+				case 'oauth':
+					if ((_p0._1.ctor === 'Just') && (_p0._2.ctor === 'Just')) {
+						return _elm_lang$core$Result$Ok(
+							_concourse$atc$Concourse_AuthMethod$OAuthMethod(
+								{displayName: _p0._1._0, authURL: _p0._2._0}));
+					} else {
+						return _elm_lang$core$Result$Err('missing fields in oauth auth method');
+					}
+				default:
+					break _v0_3;
+			}
+		} else {
+			break _v0_3;
+		}
+	} while(false);
+	return _elm_lang$core$Result$Err('unknown value for auth method type');
+};
+var _concourse$atc$Concourse_AuthMethod$decodeAuthMethods = _elm_lang$core$Json_Decode$list(
+	A2(
+		_elm_lang$core$Json_Decode$customDecoder,
+		A4(
+			_elm_lang$core$Json_Decode$object3,
+			F3(
+				function (v0, v1, v2) {
+					return {ctor: '_Tuple3', _0: v0, _1: v1, _2: v2};
+				}),
+			A2(_elm_lang$core$Json_Decode_ops[':='], 'type', _elm_lang$core$Json_Decode$string),
+			_elm_lang$core$Json_Decode$maybe(
+				A2(_elm_lang$core$Json_Decode_ops[':='], 'display_name', _elm_lang$core$Json_Decode$string)),
+			_elm_lang$core$Json_Decode$maybe(
+				A2(_elm_lang$core$Json_Decode_ops[':='], 'auth_url', _elm_lang$core$Json_Decode$string))),
+		_concourse$atc$Concourse_AuthMethod$authMethodFromTuple));
+var _concourse$atc$Concourse_AuthMethod$fetchAuthMethods = function (teamName) {
+	return A2(
+		_evancz$elm_http$Http$get,
+		_concourse$atc$Concourse_AuthMethod$decodeAuthMethods,
+		A2(
+			_elm_lang$core$Basics_ops['++'],
+			'/api/v1/teams/',
+			A2(_elm_lang$core$Basics_ops['++'], teamName, '/auth/methods')));
+};
+
+var _concourse$atc$Concourse_Team$Team = function (a) {
+	return {name: a};
+};
+var _concourse$atc$Concourse_Team$decodeTeams = _elm_lang$core$Json_Decode$list(
+	A2(
+		_elm_lang$core$Json_Decode$object1,
+		_concourse$atc$Concourse_Team$Team,
+		A2(_elm_lang$core$Json_Decode_ops[':='], 'name', _elm_lang$core$Json_Decode$string)));
+var _concourse$atc$Concourse_Team$fetchTeams = A2(_evancz$elm_http$Http$get, _concourse$atc$Concourse_Team$decodeTeams, '/api/v1/teams');
+
 var _concourse$atc$Job$paginationParam = function (page) {
 	var _p0 = page.direction;
 	if (_p0.ctor === 'Since') {
@@ -16930,11 +16884,941 @@ var _concourse$atc$JobPage$main = {
 		})
 };
 
+var _concourse$atc$Login$viewOAuthButton = function (method) {
+	var _p0 = method;
+	if (_p0.ctor === 'BasicMethod') {
+		return _elm_lang$core$Maybe$Nothing;
+	} else {
+		var _p1 = _p0._0;
+		return _elm_lang$core$Maybe$Just(
+			A2(
+				_elm_lang$html$Html$a,
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html_Attributes$href(_p1.authURL)
+					]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html$text(
+						A2(_elm_lang$core$Basics_ops['++'], 'login with ', _p1.displayName))
+					])));
+	}
+};
+var _concourse$atc$Login$viewOAuthButtons = function (methods) {
+	var _p2 = A2(_elm_lang$core$List$filterMap, _concourse$atc$Login$viewOAuthButton, methods);
+	if (_p2.ctor === '[]') {
+		return _elm_lang$core$Maybe$Nothing;
+	} else {
+		return _elm_lang$core$Maybe$Just(
+			A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html_Attributes$class('centered-contents padded-top')
+					]),
+				_p2));
+	}
+};
+var _concourse$atc$Login$viewBasicAuthForm = function (methods) {
+	return A2(_elm_lang$core$List$member, _concourse$atc$Concourse_AuthMethod$BasicMethod, methods) ? _elm_lang$core$Maybe$Just(
+		A2(
+			_elm_lang$html$Html$form,
+			_elm_lang$core$Native_List.fromArray(
+				[
+					_elm_lang$html$Html_Attributes$class('padded-top'),
+					_elm_lang$html$Html_Attributes$method('post')
+				]),
+			_elm_lang$core$Native_List.fromArray(
+				[
+					A2(
+					_elm_lang$html$Html$label,
+					_elm_lang$core$Native_List.fromArray(
+						[
+							_elm_lang$html$Html_Attributes$for('basic-auth-username-input')
+						]),
+					_elm_lang$core$Native_List.fromArray(
+						[
+							_elm_lang$html$Html$text('username')
+						])),
+					A2(
+					_elm_lang$html$Html$div,
+					_elm_lang$core$Native_List.fromArray(
+						[
+							_elm_lang$html$Html_Attributes$class('input-holder')
+						]),
+					_elm_lang$core$Native_List.fromArray(
+						[
+							A2(
+							_elm_lang$html$Html$input,
+							_elm_lang$core$Native_List.fromArray(
+								[
+									_elm_lang$html$Html_Attributes$id('basic-auth-username-input'),
+									_elm_lang$html$Html_Attributes$name('username'),
+									_elm_lang$html$Html_Attributes$type$('text')
+								]),
+							_elm_lang$core$Native_List.fromArray(
+								[]))
+						])),
+					A2(
+					_elm_lang$html$Html$label,
+					_elm_lang$core$Native_List.fromArray(
+						[
+							_elm_lang$html$Html_Attributes$for('basic-auth-password-input')
+						]),
+					_elm_lang$core$Native_List.fromArray(
+						[
+							_elm_lang$html$Html$text('password')
+						])),
+					A2(
+					_elm_lang$html$Html$div,
+					_elm_lang$core$Native_List.fromArray(
+						[
+							_elm_lang$html$Html_Attributes$class('input-holder')
+						]),
+					_elm_lang$core$Native_List.fromArray(
+						[
+							A2(
+							_elm_lang$html$Html$input,
+							_elm_lang$core$Native_List.fromArray(
+								[
+									_elm_lang$html$Html_Attributes$id('basic-auth-password-input'),
+									_elm_lang$html$Html_Attributes$name('password'),
+									_elm_lang$html$Html_Attributes$type$('password')
+								]),
+							_elm_lang$core$Native_List.fromArray(
+								[]))
+						])),
+					A2(
+					_elm_lang$html$Html$div,
+					_elm_lang$core$Native_List.fromArray(
+						[
+							_elm_lang$html$Html_Attributes$class('centered-contents')
+						]),
+					_elm_lang$core$Native_List.fromArray(
+						[
+							A2(
+							_elm_lang$html$Html$button,
+							_elm_lang$core$Native_List.fromArray(
+								[
+									_elm_lang$html$Html_Attributes$type$('submit')
+								]),
+							_elm_lang$core$Native_List.fromArray(
+								[
+									_elm_lang$html$Html$text('login')
+								]))
+						]))
+				]))) : _elm_lang$core$Maybe$Nothing;
+};
+var _concourse$atc$Login$viewNoAuthButton = A2(
+	_elm_lang$html$Html$form,
+	_elm_lang$core$Native_List.fromArray(
+		[
+			_elm_lang$html$Html_Attributes$class('padded-top centered-contents'),
+			_elm_lang$html$Html_Attributes$method('post')
+		]),
+	_elm_lang$core$Native_List.fromArray(
+		[
+			A2(
+			_elm_lang$html$Html$button,
+			_elm_lang$core$Native_List.fromArray(
+				[
+					_elm_lang$html$Html_Attributes$type$('submit')
+				]),
+			_elm_lang$core$Native_List.fromArray(
+				[
+					_elm_lang$html$Html$text('login')
+				]))
+		]));
+var _concourse$atc$Login$viewOrBar = A2(
+	_elm_lang$html$Html$div,
+	_elm_lang$core$Native_List.fromArray(
+		[
+			_elm_lang$html$Html_Attributes$class('or-bar')
+		]),
+	_elm_lang$core$Native_List.fromArray(
+		[
+			A2(
+			_elm_lang$html$Html$div,
+			_elm_lang$core$Native_List.fromArray(
+				[]),
+			_elm_lang$core$Native_List.fromArray(
+				[])),
+			A2(
+			_elm_lang$html$Html$span,
+			_elm_lang$core$Native_List.fromArray(
+				[]),
+			_elm_lang$core$Native_List.fromArray(
+				[
+					_elm_lang$html$Html$text('or')
+				]))
+		]));
+var _concourse$atc$Login$teamNameStartsWithSensitive = F2(
+	function (substring, team) {
+		return A2(_elm_lang$core$String$startsWith, substring, team.name);
+	});
+var _concourse$atc$Login$teamNameStartsWith = F2(
+	function (substring, team) {
+		return A2(
+			_elm_lang$core$String$startsWith,
+			substring,
+			_elm_lang$core$String$toLower(team.name));
+	});
+var _concourse$atc$Login$teamNameContains = F2(
+	function (substring, team) {
+		return A2(
+			_elm_lang$core$String$contains,
+			substring,
+			_elm_lang$core$String$toLower(team.name));
+	});
+var _concourse$atc$Login$filterTeams = F2(
+	function (teamFilter, teams) {
+		var filteredList = A2(
+			_elm_lang$core$List$filter,
+			_concourse$atc$Login$teamNameContains(
+				_elm_lang$core$String$toLower(teamFilter)),
+			teams);
+		var _p3 = A2(
+			_elm_lang$core$List$partition,
+			_concourse$atc$Login$teamNameStartsWith(
+				_elm_lang$core$String$toLower(teamFilter)),
+			filteredList);
+		var startingTeams = _p3._0;
+		var notStartingTeams = _p3._1;
+		var _p4 = A2(
+			_elm_lang$core$List$partition,
+			_concourse$atc$Login$teamNameStartsWithSensitive(teamFilter),
+			startingTeams);
+		var caseSensitive = _p4._0;
+		var notCaseSensitive = _p4._1;
+		return A2(
+			_elm_lang$core$Basics_ops['++'],
+			caseSensitive,
+			A2(_elm_lang$core$Basics_ops['++'], notCaseSensitive, notStartingTeams));
+	});
+var _concourse$atc$Login$assertLeftButton = F2(
+	function (message, button) {
+		return _elm_lang$core$Native_Utils.eq(button, 0) ? _elm_lang$core$Result$Ok(message) : _elm_lang$core$Result$Err('placeholder error, nothing is wrong');
+	});
+var _concourse$atc$Login$onClickPreventDefault = function (message) {
+	return A3(
+		_elm_lang$html$Html_Events$onWithOptions,
+		'click',
+		{stopPropagation: false, preventDefault: true},
+		A2(
+			_elm_lang$core$Json_Decode$customDecoder,
+			A2(_elm_lang$core$Json_Decode_ops[':='], 'button', _elm_lang$core$Json_Decode$int),
+			_concourse$atc$Login$assertLeftButton(message)));
+};
+var _concourse$atc$Login$viewLoading = A2(
+	_elm_lang$html$Html$div,
+	_elm_lang$core$Native_List.fromArray(
+		[
+			_elm_lang$html$Html_Attributes$class('loading')
+		]),
+	_elm_lang$core$Native_List.fromArray(
+		[
+			A2(
+			_elm_lang$html$Html$i,
+			_elm_lang$core$Native_List.fromArray(
+				[
+					_elm_lang$html$Html_Attributes$class('fa fa-fw fa-spin fa-circle-o-notch')
+				]),
+			_elm_lang$core$Native_List.fromArray(
+				[])),
+			_elm_lang$html$Html$text('Loading...')
+		]));
+var _concourse$atc$Login$loginRoute = F2(
+	function (redirect, teamName) {
+		return A2(
+			_elm_lang$core$Basics_ops['++'],
+			'teams/',
+			A2(
+				_elm_lang$core$Basics_ops['++'],
+				teamName,
+				A2(
+					_elm_lang$core$Basics_ops['++'],
+					'/login',
+					function () {
+						var _p5 = redirect;
+						if (_p5 === '') {
+							return '';
+						} else {
+							return A2(_elm_lang$core$Basics_ops['++'], '?redirect=', redirect);
+						}
+					}())));
+	});
+var _concourse$atc$Login$PageWithRedirect = F2(
+	function (a, b) {
+		return {page: a, redirect: b};
+	});
+var _concourse$atc$Login$TeamSelectionModel = F3(
+	function (a, b, c) {
+		return {teamFilter: a, teams: b, redirect: c};
+	});
+var _concourse$atc$Login$LoginModel = F3(
+	function (a, b, c) {
+		return {teamName: a, authMethods: b, hasTeamSelectionInBrowserHistory: c};
+	});
+var _concourse$atc$Login$LoginPage = function (a) {
+	return {ctor: 'LoginPage', _0: a};
+};
+var _concourse$atc$Login$TeamSelectionPage = {ctor: 'TeamSelectionPage'};
+var _concourse$atc$Login$defaultPage = {page: _concourse$atc$Login$TeamSelectionPage, redirect: ''};
+var _concourse$atc$Login$Login = function (a) {
+	return {ctor: 'Login', _0: a};
+};
+var _concourse$atc$Login$TeamSelection = function (a) {
+	return {ctor: 'TeamSelection', _0: a};
+};
+var _concourse$atc$Login$update = F2(
+	function (action, model) {
+		var _p6 = action;
+		switch (_p6.ctor) {
+			case 'Noop':
+				return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+			case 'FilterTeams':
+				var _p7 = model;
+				if (_p7.ctor === 'TeamSelection') {
+					return {
+						ctor: '_Tuple2',
+						_0: _concourse$atc$Login$TeamSelection(
+							_elm_lang$core$Native_Utils.update(
+								_p7._0,
+								{teamFilter: _p6._0})),
+						_1: _elm_lang$core$Platform_Cmd$none
+					};
+				} else {
+					return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+				}
+			case 'TeamsFetched':
+				if (_p6._0.ctor === 'Ok') {
+					var _p8 = model;
+					if (_p8.ctor === 'TeamSelection') {
+						return {
+							ctor: '_Tuple2',
+							_0: _concourse$atc$Login$TeamSelection(
+								_elm_lang$core$Native_Utils.update(
+									_p8._0,
+									{
+										teams: _elm_lang$core$Maybe$Just(_p6._0._0)
+									})),
+							_1: _elm_lang$core$Platform_Cmd$none
+						};
+					} else {
+						return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+					}
+				} else {
+					return A2(
+						_elm_lang$core$Debug$log,
+						A2(
+							_elm_lang$core$Basics_ops['++'],
+							'failed to fetch teams: ',
+							_elm_lang$core$Basics$toString(_p6._0._0)),
+						{ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none});
+				}
+			case 'SelectTeam':
+				var _p9 = model;
+				if (_p9.ctor === 'TeamSelection') {
+					return {
+						ctor: '_Tuple2',
+						_0: model,
+						_1: _elm_lang$navigation$Navigation$newUrl(
+							A2(_concourse$atc$Login$loginRoute, _p9._0.redirect, _p6._0))
+					};
+				} else {
+					return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+				}
+			case 'AuthFetched':
+				if (_p6._0.ctor === 'Ok') {
+					var _p10 = model;
+					if (_p10.ctor === 'Login') {
+						return {
+							ctor: '_Tuple2',
+							_0: _concourse$atc$Login$Login(
+								_elm_lang$core$Native_Utils.update(
+									_p10._0,
+									{
+										authMethods: _elm_lang$core$Maybe$Just(_p6._0._0)
+									})),
+							_1: _elm_lang$core$Platform_Cmd$none
+						};
+					} else {
+						return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+					}
+				} else {
+					return A2(
+						_elm_lang$core$Debug$log,
+						A2(
+							_elm_lang$core$Basics_ops['++'],
+							'failed to fetch auth methods: ',
+							_elm_lang$core$Basics$toString(_p6._0._0)),
+						{ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none});
+				}
+			default:
+				var _p11 = model;
+				if (_p11.ctor === 'Login') {
+					var _p12 = _p11._0.hasTeamSelectionInBrowserHistory;
+					if (_p12 === true) {
+						return {
+							ctor: '_Tuple2',
+							_0: model,
+							_1: _elm_lang$navigation$Navigation$back(1)
+						};
+					} else {
+						return {
+							ctor: '_Tuple2',
+							_0: model,
+							_1: _elm_lang$navigation$Navigation$newUrl('/login')
+						};
+					}
+				} else {
+					return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+				}
+		}
+	});
+var _concourse$atc$Login$GoBack = {ctor: 'GoBack'};
+var _concourse$atc$Login$viewLogin = function (model) {
+	return A2(
+		_elm_lang$html$Html$div,
+		_elm_lang$core$Native_List.fromArray(
+			[
+				_elm_lang$html$Html_Attributes$class('centered-contents')
+			]),
+		_elm_lang$core$Native_List.fromArray(
+			[
+				A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html_Attributes$class('small-title')
+					]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						A2(
+						_elm_lang$html$Html$a,
+						_elm_lang$core$Native_List.fromArray(
+							[
+								_concourse$atc$Login$onClickPreventDefault(_concourse$atc$Login$GoBack),
+								_elm_lang$html$Html_Attributes$href('/login')
+							]),
+						_elm_lang$core$Native_List.fromArray(
+							[
+								A2(
+								_elm_lang$html$Html$i,
+								_elm_lang$core$Native_List.fromArray(
+									[
+										_elm_lang$html$Html_Attributes$class('fa fa-fw fa-chevron-left')
+									]),
+								_elm_lang$core$Native_List.fromArray(
+									[])),
+								_elm_lang$html$Html$text('back to team selection')
+							]))
+					])),
+				A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html_Attributes$class('login-box auth-methods')
+					]),
+				A2(
+					_elm_lang$core$Basics_ops['++'],
+					_elm_lang$core$Native_List.fromArray(
+						[
+							A2(
+							_elm_lang$html$Html$div,
+							_elm_lang$core$Native_List.fromArray(
+								[
+									_elm_lang$html$Html_Attributes$class('centered-contents auth-methods-title')
+								]),
+							_elm_lang$core$Native_List.fromArray(
+								[
+									_elm_lang$html$Html$text('logging in to '),
+									A2(
+									_elm_lang$html$Html$span,
+									_elm_lang$core$Native_List.fromArray(
+										[
+											_elm_lang$html$Html_Attributes$class('bright-text')
+										]),
+									_elm_lang$core$Native_List.fromArray(
+										[
+											_elm_lang$html$Html$text(model.teamName)
+										]))
+								]))
+						]),
+					function () {
+						var _p13 = model.authMethods;
+						if (_p13.ctor === 'Nothing') {
+							return _elm_lang$core$Native_List.fromArray(
+								[_concourse$atc$Login$viewLoading]);
+						} else {
+							var _p15 = _p13._0;
+							var _p14 = {
+								ctor: '_Tuple2',
+								_0: _concourse$atc$Login$viewBasicAuthForm(_p15),
+								_1: _concourse$atc$Login$viewOAuthButtons(_p15)
+							};
+							if (_p14._0.ctor === 'Just') {
+								if (_p14._1.ctor === 'Just') {
+									return _elm_lang$core$Native_List.fromArray(
+										[_p14._1._0, _concourse$atc$Login$viewOrBar, _p14._0._0]);
+								} else {
+									return _elm_lang$core$Native_List.fromArray(
+										[_p14._0._0]);
+								}
+							} else {
+								if (_p14._1.ctor === 'Just') {
+									return _elm_lang$core$Native_List.fromArray(
+										[_p14._1._0]);
+								} else {
+									return _elm_lang$core$Native_List.fromArray(
+										[_concourse$atc$Login$viewNoAuthButton]);
+								}
+							}
+						}
+					}()))
+			]));
+};
+var _concourse$atc$Login$AuthFetched = function (a) {
+	return {ctor: 'AuthFetched', _0: a};
+};
+var _concourse$atc$Login$SelectTeam = function (a) {
+	return {ctor: 'SelectTeam', _0: a};
+};
+var _concourse$atc$Login$viewTeam = F2(
+	function (redirect, team) {
+		return A2(
+			_elm_lang$html$Html$a,
+			_elm_lang$core$Native_List.fromArray(
+				[
+					_concourse$atc$Login$onClickPreventDefault(
+					_concourse$atc$Login$SelectTeam(team.name)),
+					_elm_lang$html$Html_Attributes$href(
+					A2(_concourse$atc$Login$loginRoute, redirect, team.name))
+				]),
+			_elm_lang$core$Native_List.fromArray(
+				[
+					_elm_lang$html$Html$text(team.name)
+				]));
+	});
+var _concourse$atc$Login$TeamsFetched = function (a) {
+	return {ctor: 'TeamsFetched', _0: a};
+};
+var _concourse$atc$Login$init = function (pageResult) {
+	var pageWithRedirect = A2(_elm_lang$core$Result$withDefault, _concourse$atc$Login$defaultPage, pageResult);
+	var _p16 = pageWithRedirect.page;
+	if (_p16.ctor === 'TeamSelectionPage') {
+		return {
+			ctor: '_Tuple2',
+			_0: _concourse$atc$Login$TeamSelection(
+				{teamFilter: '', teams: _elm_lang$core$Maybe$Nothing, redirect: pageWithRedirect.redirect}),
+			_1: A2(
+				_elm_lang$core$Platform_Cmd$map,
+				_concourse$atc$Login$TeamsFetched,
+				A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _concourse$atc$Concourse_Team$fetchTeams))
+		};
+	} else {
+		var _p17 = _p16._0;
+		return {
+			ctor: '_Tuple2',
+			_0: _concourse$atc$Login$Login(
+				{teamName: _p17, authMethods: _elm_lang$core$Maybe$Nothing, hasTeamSelectionInBrowserHistory: false}),
+			_1: A2(
+				_elm_lang$core$Platform_Cmd$map,
+				_concourse$atc$Login$AuthFetched,
+				A3(
+					_elm_lang$core$Task$perform,
+					_elm_lang$core$Result$Err,
+					_elm_lang$core$Result$Ok,
+					_concourse$atc$Concourse_AuthMethod$fetchAuthMethods(_p17)))
+		};
+	}
+};
+var _concourse$atc$Login$urlUpdate = F2(
+	function (pageResult, model) {
+		var pageWithRedirect = A2(_elm_lang$core$Result$withDefault, _concourse$atc$Login$defaultPage, pageResult);
+		var _p18 = pageWithRedirect.page;
+		if (_p18.ctor === 'TeamSelectionPage') {
+			return {
+				ctor: '_Tuple2',
+				_0: _concourse$atc$Login$TeamSelection(
+					{teamFilter: '', teams: _elm_lang$core$Maybe$Nothing, redirect: pageWithRedirect.redirect}),
+				_1: A2(
+					_elm_lang$core$Platform_Cmd$map,
+					_concourse$atc$Login$TeamsFetched,
+					A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _concourse$atc$Concourse_Team$fetchTeams))
+			};
+		} else {
+			var _p19 = _p18._0;
+			return {
+				ctor: '_Tuple2',
+				_0: _concourse$atc$Login$Login(
+					{teamName: _p19, authMethods: _elm_lang$core$Maybe$Nothing, hasTeamSelectionInBrowserHistory: true}),
+				_1: A2(
+					_elm_lang$core$Platform_Cmd$map,
+					_concourse$atc$Login$AuthFetched,
+					A3(
+						_elm_lang$core$Task$perform,
+						_elm_lang$core$Result$Err,
+						_elm_lang$core$Result$Ok,
+						_concourse$atc$Concourse_AuthMethod$fetchAuthMethods(_p19)))
+			};
+		}
+	});
+var _concourse$atc$Login$FilterTeams = function (a) {
+	return {ctor: 'FilterTeams', _0: a};
+};
+var _concourse$atc$Login$Noop = {ctor: 'Noop'};
+var _concourse$atc$Login$viewTeamSelection = function (model) {
+	var filteredTeams = A2(
+		_concourse$atc$Login$filterTeams,
+		model.teamFilter,
+		A2(
+			_elm_lang$core$Maybe$withDefault,
+			_elm_lang$core$Native_List.fromArray(
+				[]),
+			model.teams));
+	return A2(
+		_elm_lang$html$Html$div,
+		_elm_lang$core$Native_List.fromArray(
+			[
+				_elm_lang$html$Html_Attributes$class('centered-contents')
+			]),
+		_elm_lang$core$Native_List.fromArray(
+			[
+				A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html_Attributes$class('small-title')
+					]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html$text('select a team to login')
+					])),
+				A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html_Attributes$class('login-box team-selection')
+					]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						A2(
+						_elm_lang$html$Html$form,
+						_elm_lang$core$Native_List.fromArray(
+							[
+								_elm_lang$html$Html_Events$onSubmit(
+								function () {
+									var _p20 = {
+										ctor: '_Tuple2',
+										_0: _elm_lang$core$List$head(filteredTeams),
+										_1: model.teamFilter
+									};
+									if (_p20._0.ctor === 'Nothing') {
+										return _concourse$atc$Login$Noop;
+									} else {
+										if (_p20._1 === '') {
+											return _concourse$atc$Login$Noop;
+										} else {
+											return _concourse$atc$Login$SelectTeam(_p20._0._0.name);
+										}
+									}
+								}()),
+								_elm_lang$html$Html_Attributes$class('filter-form input-holder')
+							]),
+						_elm_lang$core$Native_List.fromArray(
+							[
+								A2(
+								_elm_lang$html$Html$i,
+								_elm_lang$core$Native_List.fromArray(
+									[
+										_elm_lang$html$Html_Attributes$class('fa fa-fw fa-search')
+									]),
+								_elm_lang$core$Native_List.fromArray(
+									[])),
+								A2(
+								_elm_lang$html$Html$input,
+								_elm_lang$core$Native_List.fromArray(
+									[
+										_elm_lang$html$Html_Attributes$placeholder('filter teams'),
+										_elm_lang$html$Html_Attributes$autofocus(true),
+										_elm_lang$html$Html_Events$onInput(_concourse$atc$Login$FilterTeams)
+									]),
+								_elm_lang$core$Native_List.fromArray(
+									[]))
+							])),
+						function () {
+						var _p21 = model.teams;
+						if (_p21.ctor === 'Nothing') {
+							return _concourse$atc$Login$viewLoading;
+						} else {
+							return A2(
+								_elm_lang$html$Html$div,
+								_elm_lang$core$Native_List.fromArray(
+									[]),
+								A2(
+									_elm_lang$core$List$map,
+									_concourse$atc$Login$viewTeam(model.redirect),
+									filteredTeams));
+						}
+					}()
+					]))
+			]));
+};
+var _concourse$atc$Login$view = function (model) {
+	var _p22 = model;
+	if (_p22.ctor === 'TeamSelection') {
+		return _concourse$atc$Login$viewTeamSelection(_p22._0);
+	} else {
+		return _concourse$atc$Login$viewLogin(_p22._0);
+	}
+};
+
+var _evancz$url_parser$UrlParser$oneOfHelp = F3(
+	function (choices, chunks, formatter) {
+		oneOfHelp:
+		while (true) {
+			var _p0 = choices;
+			if (_p0.ctor === '[]') {
+				return _elm_lang$core$Result$Err('Tried many parsers, but none of them worked!');
+			} else {
+				var _p1 = A2(_p0._0._0, chunks, formatter);
+				if (_p1.ctor === 'Err') {
+					var _v2 = _p0._1,
+						_v3 = chunks,
+						_v4 = formatter;
+					choices = _v2;
+					chunks = _v3;
+					formatter = _v4;
+					continue oneOfHelp;
+				} else {
+					return _elm_lang$core$Result$Ok(_p1._0);
+				}
+			}
+		}
+	});
+var _evancz$url_parser$UrlParser$Chunks = F2(
+	function (a, b) {
+		return {seen: a, rest: b};
+	});
+var _evancz$url_parser$UrlParser$parse = F3(
+	function (input, _p2, url) {
+		var _p3 = _p2;
+		var _p4 = A2(
+			_p3._0,
+			A2(
+				_evancz$url_parser$UrlParser$Chunks,
+				_elm_lang$core$Native_List.fromArray(
+					[]),
+				A2(_elm_lang$core$String$split, '/', url)),
+			input);
+		if (_p4.ctor === 'Err') {
+			return _elm_lang$core$Result$Err(_p4._0);
+		} else {
+			var _p7 = _p4._0._1;
+			var _p6 = _p4._0._0.rest;
+			var _p5 = _p6;
+			if (_p5.ctor === '[]') {
+				return _elm_lang$core$Result$Ok(_p7);
+			} else {
+				if ((_p5._0 === '') && (_p5._1.ctor === '[]')) {
+					return _elm_lang$core$Result$Ok(_p7);
+				} else {
+					return _elm_lang$core$Result$Err(
+						A2(
+							_elm_lang$core$Basics_ops['++'],
+							'The parser worked, but /',
+							A2(
+								_elm_lang$core$Basics_ops['++'],
+								A2(_elm_lang$core$String$join, '/', _p6),
+								' was left over.')));
+				}
+			}
+		}
+	});
+var _evancz$url_parser$UrlParser$Parser = function (a) {
+	return {ctor: 'Parser', _0: a};
+};
+var _evancz$url_parser$UrlParser$s = function (str) {
+	return _evancz$url_parser$UrlParser$Parser(
+		F2(
+			function (_p8, result) {
+				var _p9 = _p8;
+				var _p12 = _p9.rest;
+				var _p10 = _p12;
+				if (_p10.ctor === '[]') {
+					return _elm_lang$core$Result$Err(
+						A2(_elm_lang$core$Basics_ops['++'], 'Got to the end of the URL but wanted /', str));
+				} else {
+					var _p11 = _p10._0;
+					return _elm_lang$core$Native_Utils.eq(_p11, str) ? _elm_lang$core$Result$Ok(
+						{
+							ctor: '_Tuple2',
+							_0: A2(
+								_evancz$url_parser$UrlParser$Chunks,
+								A2(_elm_lang$core$List_ops['::'], _p11, _p9.seen),
+								_p10._1),
+							_1: result
+						}) : _elm_lang$core$Result$Err(
+						A2(
+							_elm_lang$core$Basics_ops['++'],
+							'Wanted /',
+							A2(
+								_elm_lang$core$Basics_ops['++'],
+								str,
+								A2(
+									_elm_lang$core$Basics_ops['++'],
+									' but got /',
+									A2(_elm_lang$core$String$join, '/', _p12)))));
+				}
+			}));
+};
+var _evancz$url_parser$UrlParser$custom = F2(
+	function (tipe, stringToSomething) {
+		return _evancz$url_parser$UrlParser$Parser(
+			F2(
+				function (_p13, func) {
+					var _p14 = _p13;
+					var _p15 = _p14.rest;
+					if (_p15.ctor === '[]') {
+						return _elm_lang$core$Result$Err(
+							A2(_elm_lang$core$Basics_ops['++'], 'Got to the end of the URL but wanted /', tipe));
+					} else {
+						var _p17 = _p15._0;
+						var _p16 = stringToSomething(_p17);
+						if (_p16.ctor === 'Ok') {
+							return _elm_lang$core$Result$Ok(
+								{
+									ctor: '_Tuple2',
+									_0: A2(
+										_evancz$url_parser$UrlParser$Chunks,
+										A2(_elm_lang$core$List_ops['::'], _p17, _p14.seen),
+										_p15._1),
+									_1: func(_p16._0)
+								});
+						} else {
+							return _elm_lang$core$Result$Err(
+								A2(
+									_elm_lang$core$Basics_ops['++'],
+									'Parsing `',
+									A2(
+										_elm_lang$core$Basics_ops['++'],
+										_p17,
+										A2(_elm_lang$core$Basics_ops['++'], '` went wrong: ', _p16._0))));
+						}
+					}
+				}));
+	});
+var _evancz$url_parser$UrlParser$string = A2(_evancz$url_parser$UrlParser$custom, 'STRING', _elm_lang$core$Result$Ok);
+var _evancz$url_parser$UrlParser$int = A2(_evancz$url_parser$UrlParser$custom, 'NUMBER', _elm_lang$core$String$toInt);
+var _evancz$url_parser$UrlParser_ops = _evancz$url_parser$UrlParser_ops || {};
+_evancz$url_parser$UrlParser_ops['</>'] = F2(
+	function (_p19, _p18) {
+		var _p20 = _p19;
+		var _p21 = _p18;
+		return _evancz$url_parser$UrlParser$Parser(
+			F2(
+				function (chunks, func) {
+					return A2(
+						_elm_lang$core$Result$andThen,
+						A2(_p20._0, chunks, func),
+						function (_p22) {
+							var _p23 = _p22;
+							return A2(_p21._0, _p23._0, _p23._1);
+						});
+				}));
+	});
+var _evancz$url_parser$UrlParser$oneOf = function (choices) {
+	return _evancz$url_parser$UrlParser$Parser(
+		_evancz$url_parser$UrlParser$oneOfHelp(choices));
+};
+var _evancz$url_parser$UrlParser$format = F2(
+	function (input, _p24) {
+		var _p25 = _p24;
+		return _evancz$url_parser$UrlParser$Parser(
+			F2(
+				function (chunks, func) {
+					var _p26 = A2(_p25._0, chunks, input);
+					if (_p26.ctor === 'Err') {
+						return _elm_lang$core$Result$Err(_p26._0);
+					} else {
+						return _elm_lang$core$Result$Ok(
+							{
+								ctor: '_Tuple2',
+								_0: _p26._0._0,
+								_1: func(_p26._0._1)
+							});
+					}
+				}));
+	});
+
+var _concourse$atc$LoginPage$pageParser = _evancz$url_parser$UrlParser$oneOf(
+	_elm_lang$core$Native_List.fromArray(
+		[
+			A2(
+			_evancz$url_parser$UrlParser$format,
+			_concourse$atc$Login$TeamSelectionPage,
+			_evancz$url_parser$UrlParser$s('login')),
+			A2(
+			_evancz$url_parser$UrlParser$format,
+			_concourse$atc$Login$LoginPage,
+			A2(
+				_evancz$url_parser$UrlParser_ops['</>'],
+				_evancz$url_parser$UrlParser$s('teams'),
+				A2(
+					_evancz$url_parser$UrlParser_ops['</>'],
+					_evancz$url_parser$UrlParser$string,
+					_evancz$url_parser$UrlParser$s('login'))))
+		]));
+var _concourse$atc$LoginPage$redirectInserter = F2(
+	function (uri, page) {
+		return {page: page, redirect: uri};
+	});
+var _concourse$atc$LoginPage$pathnameParser = function (location) {
+	var redirect = function () {
+		var _p0 = A3(
+			_elm_lang$core$Regex$find,
+			_elm_lang$core$Regex$AtMost(1),
+			_elm_lang$core$Regex$regex('[&?]redirect=([^&]*)'),
+			location.search);
+		if ((_p0.ctor === '::') && (_p0._1.ctor === '[]')) {
+			return A2(
+				_elm_lang$core$Maybe$withDefault,
+				'',
+				A2(
+					_elm_lang$core$Maybe$withDefault,
+					_elm_lang$core$Maybe$Nothing,
+					_elm_lang$core$List$head(_p0._0.submatches)));
+		} else {
+			return '';
+		}
+	}();
+	return A3(
+		_evancz$url_parser$UrlParser$parse,
+		_concourse$atc$LoginPage$redirectInserter(redirect),
+		_concourse$atc$LoginPage$pageParser,
+		A2(_elm_lang$core$String$dropLeft, 1, location.pathname));
+};
+var _concourse$atc$LoginPage$main = {
+	main: A2(
+		_elm_lang$navigation$Navigation$program,
+		_elm_lang$navigation$Navigation$makeParser(_concourse$atc$LoginPage$pathnameParser),
+		{
+			init: _concourse$atc$Login$init,
+			update: _concourse$atc$Login$update,
+			urlUpdate: _concourse$atc$Login$urlUpdate,
+			view: _concourse$atc$Login$view,
+			subscriptions: _elm_lang$core$Basics$always(_elm_lang$core$Platform_Sub$none)
+		})
+};
+
 var Elm = {};
 Elm['BuildPage'] = Elm['BuildPage'] || {};
 _elm_lang$core$Native_Platform.addPublicModule(Elm['BuildPage'], 'BuildPage', typeof _concourse$atc$BuildPage$main === 'undefined' ? null : _concourse$atc$BuildPage$main);
 Elm['JobPage'] = Elm['JobPage'] || {};
 _elm_lang$core$Native_Platform.addPublicModule(Elm['JobPage'], 'JobPage', typeof _concourse$atc$JobPage$main === 'undefined' ? null : _concourse$atc$JobPage$main);
+Elm['LoginPage'] = Elm['LoginPage'] || {};
+_elm_lang$core$Native_Platform.addPublicModule(Elm['LoginPage'], 'LoginPage', typeof _concourse$atc$LoginPage$main === 'undefined' ? null : _concourse$atc$LoginPage$main);
 
 if (typeof define === "function" && define['amd'])
 {

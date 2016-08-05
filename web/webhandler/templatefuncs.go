@@ -217,18 +217,6 @@ func PathFor(route string, args ...interface{}) (string, error) {
 		return authPath + "?" + url.Values{
 			"redirect": {args[1].(string)},
 		}.Encode(), nil
-
-	case web.GetBasicAuthLogIn:
-		authPath, err := web.Routes.CreatePathForRoute(route, rata.Params{
-			"team_name": args[0].(string),
-		})
-		if err != nil {
-			return "", err
-		}
-
-		return authPath + "?" + url.Values{
-			"redirect": {args[1].(string)},
-		}.Encode(), nil
 	}
 
 	return "", fmt.Errorf("unknown route: %s", route)
