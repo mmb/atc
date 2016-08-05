@@ -4,12 +4,18 @@ import Html exposing (Html)
 import Html.Attributes as Attributes exposing (id, class)
 import Html.Events as Events
 import Http
+import Json.Decode exposing ((:=))
 import Navigation
 import String
 import Task
 
 import Concourse.AuthMethod exposing (AuthMethod (..))
 import Concourse.Team exposing (Team)
+
+type alias PageWithRedirect =
+  { page : Page
+  , redirect : String
+  }
 
 type Page = TeamSelectionPage | LoginPage String
 
@@ -20,6 +26,7 @@ type Model
 type alias TeamSelectionModel =
   { teamFilter : String
   , teams : Maybe (List Team)
+  , redirect : String
   }
 
 type alias LoginModel =
@@ -34,53 +41,60 @@ type Action
   | SelectTeam String
   | AuthFetched (Result Http.Error (List AuthMethod))
 
-type alias Flags =
-  { redirect : String
-  }
+defaultPage : PageWithRedirect
+defaultPage = { page = TeamSelectionPage, redirect = "" }
 
-init : Flags -> Result String Page -> (Model, Cmd Action)
-init flags pageResult =
-  case Result.withDefault TeamSelectionPage pageResult of
-    TeamSelectionPage ->
-      ( TeamSelection
-          { teamFilter = ""
-          , teams = Nothing
-          }
-      , Cmd.map TeamsFetched <| Task.perform Err Ok Concourse.Team.fetchTeams
-      )
-    LoginPage teamName ->
-      ( Login
-          { teamName = teamName
-          , authMethods = Nothing
-          }
-      , Cmd.map
-          AuthFetched <|
-          Task.perform
-            Err Ok <|
-              Concourse.AuthMethod.fetchAuthMethods teamName
-      )
+init : Result String PageWithRedirect -> (Model, Cmd Action)
+init pageResult =
+  let
+    pageWithRedirect = Result.withDefault defaultPage pageResult
+  in
+    case pageWithRedirect.page of
+      TeamSelectionPage ->
+        ( TeamSelection
+            { teamFilter = ""
+            , teams = Nothing
+            , redirect = pageWithRedirect.redirect
+            }
+        , Cmd.map TeamsFetched <| Task.perform Err Ok Concourse.Team.fetchTeams
+        )
+      LoginPage teamName ->
+        ( Login
+            { teamName = teamName
+            , authMethods = Nothing
+            }
+        , Cmd.map
+            AuthFetched <|
+            Task.perform
+              Err Ok <|
+                Concourse.AuthMethod.fetchAuthMethods teamName
+        )
 
-urlUpdate : Result String Page -> Model -> (Model, Cmd Action)
+urlUpdate : Result String PageWithRedirect -> Model -> (Model, Cmd Action)
 urlUpdate pageResult model =
-  case Result.withDefault TeamSelectionPage pageResult of
-    TeamSelectionPage ->
-      ( TeamSelection
-          { teamFilter = ""
-          , teams = Nothing
-          }
-      , Cmd.map TeamsFetched <| Task.perform Err Ok Concourse.Team.fetchTeams
-      )
-    LoginPage teamName ->
-      ( Login
-          { teamName = teamName
-          , authMethods = Nothing
-          }
-      , Cmd.map
-          AuthFetched <|
-          Task.perform
-            Err Ok <|
-              Concourse.AuthMethod.fetchAuthMethods teamName
-      )
+  let
+    pageWithRedirect = Result.withDefault defaultPage pageResult
+  in
+    case pageWithRedirect.page of
+      TeamSelectionPage ->
+        ( TeamSelection
+            { teamFilter = ""
+            , teams = Nothing
+            , redirect = pageWithRedirect.redirect
+            }
+        , Cmd.map TeamsFetched <| Task.perform Err Ok Concourse.Team.fetchTeams
+        )
+      LoginPage teamName ->
+        ( Login
+            { teamName = teamName
+            , authMethods = Nothing
+            }
+        , Cmd.map
+            AuthFetched <|
+            Task.perform
+              Err Ok <|
+                Concourse.AuthMethod.fetchAuthMethods teamName
+        )
 
 update : Action -> Model -> (Model, Cmd Action)
 update action model =
@@ -105,7 +119,12 @@ update action model =
       Debug.log ("failed to fetch teams: " ++ toString err) <|
         (model, Cmd.none)
     SelectTeam teamName ->
-      (model, Navigation.newUrl <| "teams/" ++ teamName ++ "/login")
+      case model of
+        TeamSelection tsModel ->
+          ( model
+          , Navigation.newUrl <| loginRoute tsModel.redirect teamName
+          )
+        Login _ -> (model, Cmd.none)
     AuthFetched (Ok authMethods) ->
       case model of
         Login loginModel ->
@@ -118,123 +137,84 @@ update action model =
       Debug.log ("failed to fetch auth methods: " ++ toString err) <|
         (model, Cmd.none)
 
+loginRoute : String -> String -> String
+loginRoute redirect teamName =
+  "teams/" ++ teamName ++ "/login" ++
+    case redirect of
+      "" -> ""
+      _ -> "?redirect=" ++ redirect
+
 view : Model -> Html Action
 view model =
   case model of
-    TeamSelection tModel ->
-      let filteredTeams =
-        filterTeams tModel.teamFilter <| Maybe.withDefault [] tModel.teams
-      in
-        Html.div
-          [ class "centered-contents" ]
-          [ Html.div
-              [ class "small-title" ]
-              [ Html.text "select a team to login" ]
-          , Html.div
-              [ class "login-box team-selection" ] <|
-              [ Html.form
-                  [ Events.onSubmit <|
-                      case (List.head filteredTeams, tModel.teamFilter) of
-                        (Nothing, _) -> Noop
-                        (Just _, "") -> Noop
-                        (Just firstTeam, _) -> SelectTeam firstTeam.name
-                  , class "filter-form input-holder"
-                  ]
-                  [ Html.i [class "fa fa-fw fa-search"] []
-                  , Html.input
-                      [ Attributes.placeholder "filter teams"
-                      , Attributes.autofocus True
-                      , Events.onInput FilterTeams
-                      ]
-                      []
-                  ]
-              ] ++
-                case tModel.teams of
-                  Nothing ->
-                    [ Html.div [class "loading"]
-                        [ Html.i [class "fa fa-fw fa-spin fa-circle-o-notch"] []
-                        , Html.text "Loading..."
-                        ]
-                    ]
-                  Just _ -> List.map viewTeam filteredTeams
-          ]
+    TeamSelection tModel -> viewTeamSelection tModel
+    Login lModel -> viewLogin lModel
 
-    Login lModel ->
-      Html.div
-        [ class "centered-contents" ]
-        [ Html.div [ class "small-title" ] []
-        , Html.div
-            [ class "login-box auth-methods" ] <|
-            [ Html.div
-                [ class "centered-contents auth-methods-title" ]
-                [ Html.text "logging in to "
-                , Html.span
-                    [ class "bright-text" ]
-                    [ Html.text lModel.teamName ]
-                ]
-            ] ++
-              ( if List.member BasicMethod <| Maybe.withDefault [] lModel.authMethods then
-                  [ Html.form
-                    [ class "padded-top"
-                    , Attributes.method "post"
-                    ]
-                    [ Html.div []
-                        [ Html.label
-                          [ Attributes.for "basic-auth-username-input" ]
-                          [ Html.text "username" ]
-                        ]
-                    , Html.div
-                        [ class "input-holder" ]
-                        [ Html.input
-                            [ id "basic-auth-username-input"
-                            , Attributes.name "username"
-                            , Attributes.type' "text"
-                            ]
-                            []
-                        ]
-                    , Html.div []
-                      [ Html.label
-                          [ Attributes.for "basic-auth-password-input" ]
-                          [ Html.text "password" ]
-                      ]
-                    , Html.div
-                        [ class "input-holder" ]
-                        [ Html.input
-                            [ id "basic-auth-password-input"
-                            , Attributes.name "password"
-                            , Attributes.type' "password"
-                            ]
-                            []
-                        ]
-                    , Html.div
-                        [ class "centered-contents" ]
-                        [ Html.button
-                            [ Attributes.type' "submit" ]
-                            [ Html.text "login" ]
-                        ]
-                    ]
+viewLoading : Html action
+viewLoading =
+  Html.div [class "loading"]
+    [ Html.i [class "fa fa-fw fa-spin fa-circle-o-notch"] []
+    , Html.text "Loading..."
+    ]
+
+viewTeamSelection : TeamSelectionModel -> Html Action
+viewTeamSelection model =
+  let filteredTeams =
+    filterTeams model.teamFilter <| Maybe.withDefault [] model.teams
+  in
+    Html.div
+      [ class "centered-contents" ]
+      [ Html.div
+          [ class "small-title" ]
+          [ Html.text "select a team to login" ]
+      , Html.div
+          [ class "login-box team-selection" ]
+          [ Html.form
+              [ Events.onSubmit <|
+                  case (List.head filteredTeams, model.teamFilter) of
+                    (Nothing, _) -> Noop
+                    (Just _, "") -> Noop
+                    (Just firstTeam, _) -> SelectTeam firstTeam.name
+              , class "filter-form input-holder"
+              ]
+              [ Html.i [class "fa fa-fw fa-search"] []
+              , Html.input
+                  [ Attributes.placeholder "filter teams"
+                  , Attributes.autofocus True
+                  , Events.onInput FilterTeams
                   ]
-                else
                   []
-              ) ++
-              let
-                loginButtons =
-                  List.filterMap
-                    viewLoginButton <|
-                    Maybe.withDefault [] lModel.authMethods
-              in
-                if loginButtons == [] then []
-                else
-                  [ Html.div
-                      [ class "or-bar" ]
-                      [ Html.div [] []
-                      , Html.span [] [ Html.text "or" ]
-                      ]
-                  , Html.div
-                      [ class "centered-contents padded-top" ]
-                      loginButtons
-                  ]
-        ]
+              ]
+          , case model.teams of
+              Nothing -> viewLoading
+              Just _ ->
+                Html.div
+                  [] <|
+                  List.map (viewTeam model.redirect) filteredTeams
+          ]
+      ]
+
+onClickPreventDefault : msg -> Html.Attribute msg
+onClickPreventDefault message =
+  Events.onWithOptions
+    "click"
+    {stopPropagation = False, preventDefault = True} <|
+    Json.Decode.customDecoder
+      ("button" := Json.Decode.int) <|
+      assertLeftButton message
+
+assertLeftButton : a -> Int -> Result String a
+assertLeftButton message button =
+  if button == 0 then Ok message
+  else Err "placeholder error, nothing is wrong"
+
+viewTeam : String -> Team -> Html Action
+viewTeam redirect team =
+  Html.a
+    [ onClickPreventDefault <| SelectTeam team.name
+    , Attributes.href <| loginRoute redirect team.name
+    ]
+    [ Html.text <| team.name ]
 
 filterTeams : String -> List Team -> List Team
 filterTeams teamFilter teams =
@@ -265,14 +245,102 @@ teamNameStartsWithSensitive : String -> Team -> Bool
 teamNameStartsWithSensitive substring team =
   String.startsWith substring team.name
 
-viewTeam : Team -> Html Action
-viewTeam team =
-  Html.a
-    [ Events.onClick <| SelectTeam team.name, Attributes.href "javascript:void(0)" ]
-    [ Html.text <| team.name ]
+viewLogin : LoginModel -> Html action
+viewLogin model =
+  Html.div
+    [ class "centered-contents" ]
+    [ Html.div [ class "small-title" ] []
+    , Html.div
+        [ class "login-box auth-methods" ] <|
+        [ Html.div
+            [ class "centered-contents auth-methods-title" ]
+            [ Html.text "logging in to "
+            , Html.span
+                [ class "bright-text" ]
+                [ Html.text model.teamName ]
+            ]
+        ] ++
+          case model.authMethods of
+            Nothing -> [ viewLoading ]
+            Just methods ->
+              case (viewBasicAuthForm methods, viewOAuthButtons methods) of
+                (Just basicForm, Just buttons) ->
+                  [ buttons, viewOrBar, basicForm ]
+                (Just basicForm, Nothing) -> [ basicForm ]
+                (Nothing, Just buttons) -> [ buttons ]
+                (Nothing, Nothing) -> [ viewNoAuthButton ]
+    ]
 
-viewLoginButton : AuthMethod -> Maybe (Html action)
-viewLoginButton method =
+viewOrBar : Html action
+viewOrBar =
+  Html.div
+    [ class "or-bar" ]
+    [ Html.div [] []
+    , Html.span [] [ Html.text "or" ]
+    ]
+
+viewNoAuthButton : Html action
+viewNoAuthButton =
+  Html.form
+    [ class "padded-top centered-contents"
+    , Attributes.method "post"
+    ]
+    [ Html.button
+        [ Attributes.type' "submit" ]
+        [ Html.text "login" ]
+    ]
+
+viewBasicAuthForm : List AuthMethod -> Maybe (Html action)
+viewBasicAuthForm methods =
+  if List.member BasicMethod methods then
+    Just <|
+      Html.form
+        [ class "padded-top"
+        , Attributes.method "post"
+        ]
+        [ Html.label
+            [ Attributes.for "basic-auth-username-input" ]
+            [ Html.text "username" ]
+        , Html.div
+            [ class "input-holder" ]
+            [ Html.input
+                [ id "basic-auth-username-input"
+                , Attributes.name "username"
+                , Attributes.type' "text"
+                ]
+                []
+            ]
+        , Html.label
+            [ Attributes.for "basic-auth-password-input" ]
+            [ Html.text "password" ]
+        , Html.div
+            [ class "input-holder" ]
+            [ Html.input
+                [ id "basic-auth-password-input"
+                , Attributes.name "password"
+                , Attributes.type' "password"
+                ]
+                []
+            ]
+        , Html.div
+            [ class "centered-contents" ]
+            [ Html.button
+                [ Attributes.type' "submit" ]
+                [ Html.text "login" ]
+            ]
+        ]
+  else Nothing
+
+viewOAuthButtons : List AuthMethod -> Maybe (Html action)
+viewOAuthButtons methods =
+  case List.filterMap viewOAuthButton methods of
+    [] -> Nothing
+    buttons ->
+      Just <|
+        Html.div [ class "centered-contents padded-top" ] buttons
+
+viewOAuthButton : AuthMethod -> Maybe (Html action)
+viewOAuthButton method =
   case method of
     BasicMethod -> Nothing
     OAuthMethod oAuthMethod ->
