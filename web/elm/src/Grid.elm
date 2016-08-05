@@ -260,10 +260,31 @@ terminals grid =
       Set.empty
 
     Parallel grids ->
-      List.foldl (\g s -> Set.union s (terminals g)) Set.empty grids
+      if List.any (Set.isEmpty << terminals) grids then
+        -- this is kind of a hack, but without it, if inserting the last node
+        -- of a matrix of pipelines, the entire matrix is considered to be
+        -- "exclusive" to that node, and so the last node ends up being placed
+        -- after the entire matrix if it has any other "truly" exclusive nodes
+        -- (i.e. an unconstrained input)
+        Set.empty
+      else
+        List.foldl (\g s -> Set.union s (terminals g)) Set.empty grids
 
     Serial a b ->
-      Set.diff (Set.union (terminals a) (terminals b)) (nodes b)
+      let
+        aTerms =
+          terminals a
+
+        bTerms =
+          terminals b
+
+        joined =
+          Set.union aTerms bTerms
+
+        bNodes =
+          nodes b
+      in
+        Set.diff joined bNodes
 
     Cell nc ->
       Set.fromList (IntDict.keys nc.outgoing)
