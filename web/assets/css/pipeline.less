@@ -1,5 +1,12 @@
 .pipeline-grid {
   padding: 20px;
+  padding-bottom: 10px; // account for node margins
+  display: none;
+  float: left;
+
+  > * {
+    align-items: flex-start;
+  }
 
   * {
     box-sizing: border-box;
@@ -9,12 +16,13 @@
 .node {
   text-align: center;
   display: flex; /* this does interesting but maybe good things? */
+  flex-grow: 1;
 
   a {
     flex-grow: 1;
     line-height: 30px;
     white-space: nowrap;
-    width: 150px;
+    // width: 150px;
     padding: 0 10px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -31,14 +39,6 @@
 
 .input a {
   text-align: left;
-}
-
-.input:not(.constrained) a {
-  text-align: right;
-}
-
-.input.constrained a {
-  background: linear-gradient(to right, @base00, fade(@base00, 33%) 25px, fade(@base00, 33%));
 }
 
 .output {
@@ -68,11 +68,6 @@
   // border: 1px solid red;
   flex-grow: 1;
   justify-content: flex-start;
-  align-items: center;
-}
-
-.parallel-grid .parallel-grid {
-  align-items: stretch;
 }
 
 .serial-grid {
@@ -85,7 +80,11 @@
 
 .input, .output {
   a {
+    // max-height: 30px;
     background: @base00;
+    font-weight: normal;
+    color: @base05;
+    font-size: 12px;
   }
 }
 
@@ -93,3 +92,17 @@
   text-align: right;
   flex-grow: 0;
 }
+
+.job {
+  flex-grow: 0;
+}
+
+.input:not(.constrained) a {
+  text-align: right;
+}
+
+.input.constrained a {
+  background: linear-gradient(to left, @base00, fade(@base00, 33%) 25px, fade(@base00, 33%));
+  color: @base04;
+}
+

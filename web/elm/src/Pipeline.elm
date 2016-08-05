@@ -1,5 +1,6 @@
 module Pipeline exposing (..)
 
+import AnimationFrame
 import Dict exposing (Dict)
 import Graph exposing (Graph)
 import Html exposing (Html)
@@ -15,7 +16,8 @@ import Concourse.BuildStatus exposing (BuildStatus)
 import Grid exposing (Grid)
 
 type alias Model =
-  { pipelineLocator : Concourse.Job.PipelineLocator
+  { fit : Maybe (() -> Cmd Msg)
+  , pipelineLocator : Concourse.Job.PipelineLocator
   , jobs : List Job
   , graph : Graph Node ()
   , error : Maybe String
@@ -45,10 +47,12 @@ type alias Flags =
 type Msg
   = Noop
   | JobsFetched (Result Http.Error (List Job))
+  | Frame
 
-init : Flags -> (Model, Cmd Msg)
-init flags =
-  ( { pipelineLocator = flags
+init : (() -> Cmd Msg) -> Flags -> (Model, Cmd Msg)
+init fit flags =
+  ( { fit = Just fit
+    , pipelineLocator = flags
     , jobs = []
     , graph = Graph.empty
     , error = Nothing
@@ -63,10 +67,29 @@ update msg model =
       (model, Cmd.none)
 
     JobsFetched (Ok jobs) ->
-      ({ model | jobs = jobs, graph = initGraph jobs }, Cmd.none)
+      let
+        filtered =
+          jobs
+          -- List.filter (List.member "develop" << .groups) jobs
+      in
+        ({ model | jobs = filtered, graph = initGraph filtered }, Cmd.none)
 
     JobsFetched (Err msg) ->
       ({ model | error = Just (toString msg) }, Cmd.none)
+
+    Frame ->
+      case model.fit of
+        Just fit ->
+          ({ model | fit = Nothing }, fit ())
+        Nothing ->
+          (model, Cmd.none)
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+  if List.isEmpty model.jobs || model.fit == Nothing then
+    Sub.none
+  else
+    AnimationFrame.times (always Frame)
 
 view : Model -> Html Msg
 view model =

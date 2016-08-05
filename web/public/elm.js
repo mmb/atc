@@ -1518,22 +1518,124 @@ var _elm_lang$core$List$intersperse = F2(
 			return A2(_elm_lang$core$List_ops['::'], _p21._0, spersed);
 		}
 	});
-var _elm_lang$core$List$take = F2(
+var _elm_lang$core$List$takeReverse = F3(
+	function (n, list, taken) {
+		takeReverse:
+		while (true) {
+			if (_elm_lang$core$Native_Utils.cmp(n, 0) < 1) {
+				return taken;
+			} else {
+				var _p22 = list;
+				if (_p22.ctor === '[]') {
+					return taken;
+				} else {
+					var _v23 = n - 1,
+						_v24 = _p22._1,
+						_v25 = A2(_elm_lang$core$List_ops['::'], _p22._0, taken);
+					n = _v23;
+					list = _v24;
+					taken = _v25;
+					continue takeReverse;
+				}
+			}
+		}
+	});
+var _elm_lang$core$List$takeTailRec = F2(
 	function (n, list) {
+		return _elm_lang$core$List$reverse(
+			A3(
+				_elm_lang$core$List$takeReverse,
+				n,
+				list,
+				_elm_lang$core$Native_List.fromArray(
+					[])));
+	});
+var _elm_lang$core$List$takeFast = F3(
+	function (ctr, n, list) {
 		if (_elm_lang$core$Native_Utils.cmp(n, 0) < 1) {
 			return _elm_lang$core$Native_List.fromArray(
 				[]);
 		} else {
-			var _p22 = list;
-			if (_p22.ctor === '[]') {
-				return list;
-			} else {
-				return A2(
-					_elm_lang$core$List_ops['::'],
-					_p22._0,
-					A2(_elm_lang$core$List$take, n - 1, _p22._1));
-			}
+			var _p23 = {ctor: '_Tuple2', _0: n, _1: list};
+			_v26_5:
+			do {
+				_v26_1:
+				do {
+					if (_p23.ctor === '_Tuple2') {
+						if (_p23._1.ctor === '[]') {
+							return list;
+						} else {
+							if (_p23._1._1.ctor === '::') {
+								switch (_p23._0) {
+									case 1:
+										break _v26_1;
+									case 2:
+										return _elm_lang$core$Native_List.fromArray(
+											[_p23._1._0, _p23._1._1._0]);
+									case 3:
+										if (_p23._1._1._1.ctor === '::') {
+											return _elm_lang$core$Native_List.fromArray(
+												[_p23._1._0, _p23._1._1._0, _p23._1._1._1._0]);
+										} else {
+											break _v26_5;
+										}
+									default:
+										if ((_p23._1._1._1.ctor === '::') && (_p23._1._1._1._1.ctor === '::')) {
+											var _p28 = _p23._1._1._1._0;
+											var _p27 = _p23._1._1._0;
+											var _p26 = _p23._1._0;
+											var _p25 = _p23._1._1._1._1._0;
+											var _p24 = _p23._1._1._1._1._1;
+											return (_elm_lang$core$Native_Utils.cmp(ctr, 1000) > 0) ? A2(
+												_elm_lang$core$List_ops['::'],
+												_p26,
+												A2(
+													_elm_lang$core$List_ops['::'],
+													_p27,
+													A2(
+														_elm_lang$core$List_ops['::'],
+														_p28,
+														A2(
+															_elm_lang$core$List_ops['::'],
+															_p25,
+															A2(_elm_lang$core$List$takeTailRec, n - 4, _p24))))) : A2(
+												_elm_lang$core$List_ops['::'],
+												_p26,
+												A2(
+													_elm_lang$core$List_ops['::'],
+													_p27,
+													A2(
+														_elm_lang$core$List_ops['::'],
+														_p28,
+														A2(
+															_elm_lang$core$List_ops['::'],
+															_p25,
+															A3(_elm_lang$core$List$takeFast, ctr + 1, n - 4, _p24)))));
+										} else {
+											break _v26_5;
+										}
+								}
+							} else {
+								if (_p23._0 === 1) {
+									break _v26_1;
+								} else {
+									break _v26_5;
+								}
+							}
+						}
+					} else {
+						break _v26_5;
+					}
+				} while(false);
+				return _elm_lang$core$Native_List.fromArray(
+					[_p23._1._0]);
+			} while(false);
+			return list;
 		}
+	});
+var _elm_lang$core$List$take = F2(
+	function (n, list) {
+		return A3(_elm_lang$core$List$takeFast, 0, n, list);
 	});
 var _elm_lang$core$List$repeatHelp = F3(
 	function (result, n, value) {
@@ -1542,12 +1644,12 @@ var _elm_lang$core$List$repeatHelp = F3(
 			if (_elm_lang$core$Native_Utils.cmp(n, 0) < 1) {
 				return result;
 			} else {
-				var _v23 = A2(_elm_lang$core$List_ops['::'], value, result),
-					_v24 = n - 1,
-					_v25 = value;
-				result = _v23;
-				n = _v24;
-				value = _v25;
+				var _v27 = A2(_elm_lang$core$List_ops['::'], value, result),
+					_v28 = n - 1,
+					_v29 = value;
+				result = _v27;
+				n = _v28;
+				value = _v29;
 				continue repeatHelp;
 			}
 		}
@@ -2530,7 +2632,10 @@ function work()
 	var process;
 	while (numSteps < MAX_STEPS && (process = workQueue.shift()))
 	{
-		numSteps = step(numSteps, process);
+		if (process.root)
+		{
+			numSteps = step(numSteps, process);
+		}
 	}
 	if (!process)
 	{
@@ -4164,13 +4269,21 @@ function endsWith(sub, str)
 function indexes(sub, str)
 {
 	var subLen = sub.length;
+	
+	if (subLen < 1)
+	{
+		return _elm_lang$core$Native_List.Nil;
+	}
+
 	var i = 0;
 	var is = [];
+
 	while ((i = str.indexOf(sub, i)) > -1)
 	{
 		is.push(i);
 		i = i + subLen;
-	}
+	}	
+	
 	return _elm_lang$core$Native_List.fromArray(is);
 }
 
@@ -4299,6 +4412,7 @@ return {
 };
 
 }();
+
 //import Native.Utils //
 
 var _elm_lang$core$Native_Char = function() {
@@ -5786,7 +5900,7 @@ function badToString(problem)
 					+ ':\n\n' + problems.join('\n');
 
 			case 'custom':
-				return 'A `customDecode` failed'
+				return 'A `customDecoder` failed'
 					+ (context === '_' ? '' : ' at ' + context)
 					+ ' with the message: ' + problem.msg;
 
@@ -14449,7 +14563,9 @@ var _concourse$atc$Concourse_Job$Job = function (a) {
 							return function (h) {
 								return function (i) {
 									return function (j) {
-										return {teamName: a, pipelineName: b, name: c, url: d, nextBuild: e, finishedBuild: f, paused: g, disableManualTrigger: h, inputs: i, outputs: j};
+										return function (k) {
+											return {teamName: a, pipelineName: b, name: c, url: d, nextBuild: e, finishedBuild: f, paused: g, disableManualTrigger: h, inputs: i, outputs: j, groups: k};
+										};
 									};
 								};
 							};
@@ -14510,24 +14626,35 @@ var _concourse$atc$Concourse_Job$decode = F2(
 									_elm_community$json_extra$Json_Decode_Extra_ops['|:'],
 									A2(
 										_elm_community$json_extra$Json_Decode_Extra_ops['|:'],
-										_elm_lang$core$Json_Decode$succeed(
-											A2(_concourse$atc$Concourse_Job$Job, teamName, pipelineName)),
-										A2(_elm_lang$core$Json_Decode_ops[':='], 'name', _elm_lang$core$Json_Decode$string)),
-									A2(_elm_lang$core$Json_Decode_ops[':='], 'url', _elm_lang$core$Json_Decode$string)),
+										A2(
+											_elm_community$json_extra$Json_Decode_Extra_ops['|:'],
+											_elm_lang$core$Json_Decode$succeed(
+												A2(_concourse$atc$Concourse_Job$Job, teamName, pipelineName)),
+											A2(_elm_lang$core$Json_Decode_ops[':='], 'name', _elm_lang$core$Json_Decode$string)),
+										A2(_elm_lang$core$Json_Decode_ops[':='], 'url', _elm_lang$core$Json_Decode$string)),
+									_elm_lang$core$Json_Decode$maybe(
+										A2(_elm_lang$core$Json_Decode_ops[':='], 'next_build', _concourse$atc$Concourse_Build$decode))),
 								_elm_lang$core$Json_Decode$maybe(
-									A2(_elm_lang$core$Json_Decode_ops[':='], 'next_build', _concourse$atc$Concourse_Build$decode))),
-							_elm_lang$core$Json_Decode$maybe(
-								A2(_elm_lang$core$Json_Decode_ops[':='], 'finished_build', _concourse$atc$Concourse_Build$decode))),
+									A2(_elm_lang$core$Json_Decode_ops[':='], 'finished_build', _concourse$atc$Concourse_Build$decode))),
+							A2(
+								_concourse$atc$Concourse_Job$optional,
+								false,
+								_elm_lang$core$Json_Decode$maybe(
+									A2(_elm_lang$core$Json_Decode_ops[':='], 'paused', _elm_lang$core$Json_Decode$bool)))),
 						A2(
 							_concourse$atc$Concourse_Job$optional,
 							false,
 							_elm_lang$core$Json_Decode$maybe(
-								A2(_elm_lang$core$Json_Decode_ops[':='], 'paused', _elm_lang$core$Json_Decode$bool)))),
+								A2(_elm_lang$core$Json_Decode_ops[':='], 'disable_manual_trigger', _elm_lang$core$Json_Decode$bool)))),
 					A2(
 						_concourse$atc$Concourse_Job$optional,
-						false,
+						_elm_lang$core$Native_List.fromArray(
+							[]),
 						_elm_lang$core$Json_Decode$maybe(
-							A2(_elm_lang$core$Json_Decode_ops[':='], 'disable_manual_trigger', _elm_lang$core$Json_Decode$bool)))),
+							A2(
+								_elm_lang$core$Json_Decode_ops[':='],
+								'inputs',
+								_elm_lang$core$Json_Decode$list(_concourse$atc$Concourse_Job$decodeInput))))),
 				A2(
 					_concourse$atc$Concourse_Job$optional,
 					_elm_lang$core$Native_List.fromArray(
@@ -14535,8 +14662,8 @@ var _concourse$atc$Concourse_Job$decode = F2(
 					_elm_lang$core$Json_Decode$maybe(
 						A2(
 							_elm_lang$core$Json_Decode_ops[':='],
-							'inputs',
-							_elm_lang$core$Json_Decode$list(_concourse$atc$Concourse_Job$decodeInput))))),
+							'outputs',
+							_elm_lang$core$Json_Decode$list(_concourse$atc$Concourse_Job$decodeOutput))))),
 			A2(
 				_concourse$atc$Concourse_Job$optional,
 				_elm_lang$core$Native_List.fromArray(
@@ -14544,8 +14671,8 @@ var _concourse$atc$Concourse_Job$decode = F2(
 				_elm_lang$core$Json_Decode$maybe(
 					A2(
 						_elm_lang$core$Json_Decode_ops[':='],
-						'outputs',
-						_elm_lang$core$Json_Decode$list(_concourse$atc$Concourse_Job$decodeOutput)))));
+						'groups',
+						_elm_lang$core$Json_Decode$list(_elm_lang$core$Json_Decode$string)))));
 	});
 var _concourse$atc$Concourse_Job$fetchJob = function (job) {
 	return A2(
@@ -19723,6 +19850,183 @@ var _concourse$atc$JobPage$main = {
 		})
 };
 
+var _elm_lang$animation_frame$Native_AnimationFrame = function()
+{
+
+var hasStartTime =
+	window.performance &&
+	window.performance.timing &&
+	window.performance.timing.navigationStart;
+
+var navStart = hasStartTime
+	? window.performance.timing.navigationStart
+	: Date.now();
+
+var rAF = _elm_lang$core$Native_Scheduler.nativeBinding(function(callback)
+{
+	var id = requestAnimationFrame(function(time) {
+		var timeNow = time
+			? (time > navStart ? time : time + navStart)
+			: Date.now();
+
+		callback(_elm_lang$core$Native_Scheduler.succeed(timeNow));
+	});
+
+	return function() {
+		cancelAnimationFrame(id);
+	};
+});
+
+return {
+	rAF: rAF
+};
+
+}();
+
+var _elm_lang$animation_frame$AnimationFrame$rAF = _elm_lang$animation_frame$Native_AnimationFrame.rAF;
+var _elm_lang$animation_frame$AnimationFrame$subscription = _elm_lang$core$Native_Platform.leaf('AnimationFrame');
+var _elm_lang$animation_frame$AnimationFrame$State = F3(
+	function (a, b, c) {
+		return {subs: a, request: b, oldTime: c};
+	});
+var _elm_lang$animation_frame$AnimationFrame$init = _elm_lang$core$Task$succeed(
+	A3(
+		_elm_lang$animation_frame$AnimationFrame$State,
+		_elm_lang$core$Native_List.fromArray(
+			[]),
+		_elm_lang$core$Maybe$Nothing,
+		0));
+var _elm_lang$animation_frame$AnimationFrame$onEffects = F3(
+	function (router, subs, _p0) {
+		var _p1 = _p0;
+		var _p5 = _p1.request;
+		var _p4 = _p1.oldTime;
+		var _p2 = {ctor: '_Tuple2', _0: _p5, _1: subs};
+		if (_p2._0.ctor === 'Nothing') {
+			if (_p2._1.ctor === '[]') {
+				return _elm_lang$core$Task$succeed(
+					A3(
+						_elm_lang$animation_frame$AnimationFrame$State,
+						_elm_lang$core$Native_List.fromArray(
+							[]),
+						_elm_lang$core$Maybe$Nothing,
+						_p4));
+			} else {
+				return A2(
+					_elm_lang$core$Task$andThen,
+					_elm_lang$core$Process$spawn(
+						A2(
+							_elm_lang$core$Task$andThen,
+							_elm_lang$animation_frame$AnimationFrame$rAF,
+							_elm_lang$core$Platform$sendToSelf(router))),
+					function (pid) {
+						return A2(
+							_elm_lang$core$Task$andThen,
+							_elm_lang$core$Time$now,
+							function (time) {
+								return _elm_lang$core$Task$succeed(
+									A3(
+										_elm_lang$animation_frame$AnimationFrame$State,
+										subs,
+										_elm_lang$core$Maybe$Just(pid),
+										time));
+							});
+					});
+			}
+		} else {
+			if (_p2._1.ctor === '[]') {
+				return A2(
+					_elm_lang$core$Task$andThen,
+					_elm_lang$core$Process$kill(_p2._0._0),
+					function (_p3) {
+						return _elm_lang$core$Task$succeed(
+							A3(
+								_elm_lang$animation_frame$AnimationFrame$State,
+								_elm_lang$core$Native_List.fromArray(
+									[]),
+								_elm_lang$core$Maybe$Nothing,
+								_p4));
+					});
+			} else {
+				return _elm_lang$core$Task$succeed(
+					A3(_elm_lang$animation_frame$AnimationFrame$State, subs, _p5, _p4));
+			}
+		}
+	});
+var _elm_lang$animation_frame$AnimationFrame$onSelfMsg = F3(
+	function (router, newTime, _p6) {
+		var _p7 = _p6;
+		var _p10 = _p7.subs;
+		var diff = newTime - _p7.oldTime;
+		var send = function (sub) {
+			var _p8 = sub;
+			if (_p8.ctor === 'Time') {
+				return A2(
+					_elm_lang$core$Platform$sendToApp,
+					router,
+					_p8._0(newTime));
+			} else {
+				return A2(
+					_elm_lang$core$Platform$sendToApp,
+					router,
+					_p8._0(diff));
+			}
+		};
+		return A2(
+			_elm_lang$core$Task$andThen,
+			_elm_lang$core$Process$spawn(
+				A2(
+					_elm_lang$core$Task$andThen,
+					_elm_lang$animation_frame$AnimationFrame$rAF,
+					_elm_lang$core$Platform$sendToSelf(router))),
+			function (pid) {
+				return A2(
+					_elm_lang$core$Task$andThen,
+					_elm_lang$core$Task$sequence(
+						A2(_elm_lang$core$List$map, send, _p10)),
+					function (_p9) {
+						return _elm_lang$core$Task$succeed(
+							A3(
+								_elm_lang$animation_frame$AnimationFrame$State,
+								_p10,
+								_elm_lang$core$Maybe$Just(pid),
+								newTime));
+					});
+			});
+	});
+var _elm_lang$animation_frame$AnimationFrame$Diff = function (a) {
+	return {ctor: 'Diff', _0: a};
+};
+var _elm_lang$animation_frame$AnimationFrame$diffs = function (tagger) {
+	return _elm_lang$animation_frame$AnimationFrame$subscription(
+		_elm_lang$animation_frame$AnimationFrame$Diff(tagger));
+};
+var _elm_lang$animation_frame$AnimationFrame$Time = function (a) {
+	return {ctor: 'Time', _0: a};
+};
+var _elm_lang$animation_frame$AnimationFrame$times = function (tagger) {
+	return _elm_lang$animation_frame$AnimationFrame$subscription(
+		_elm_lang$animation_frame$AnimationFrame$Time(tagger));
+};
+var _elm_lang$animation_frame$AnimationFrame$subMap = F2(
+	function (func, sub) {
+		var _p11 = sub;
+		if (_p11.ctor === 'Time') {
+			return _elm_lang$animation_frame$AnimationFrame$Time(
+				function (_p12) {
+					return func(
+						_p11._0(_p12));
+				});
+		} else {
+			return _elm_lang$animation_frame$AnimationFrame$Diff(
+				function (_p13) {
+					return func(
+						_p11._0(_p13));
+				});
+		}
+	});
+_elm_lang$core$Native_Platform.effectManagers['AnimationFrame'] = {pkg: 'elm-lang/animation-frame', init: _elm_lang$animation_frame$AnimationFrame$init, onEffects: _elm_lang$animation_frame$AnimationFrame$onEffects, onSelfMsg: _elm_lang$animation_frame$AnimationFrame$onSelfMsg, tag: 'sub', subMap: _elm_lang$animation_frame$AnimationFrame$subMap};
+
 var _concourse$atc$Pipeline$outputNodes = F2(
 	function (job, _p0) {
 		var _p1 = _p0;
@@ -19999,9 +20303,9 @@ var _concourse$atc$Pipeline$view = function (model) {
 				]));
 	}
 };
-var _concourse$atc$Pipeline$Model = F4(
-	function (a, b, c, d) {
-		return {pipelineLocator: a, jobs: b, graph: c, error: d};
+var _concourse$atc$Pipeline$Model = F5(
+	function (a, b, c, d, e) {
+		return {fit: a, pipelineLocator: b, jobs: c, graph: d, error: e};
 	});
 var _concourse$atc$Pipeline$Flags = F2(
 	function (a, b) {
@@ -20020,8 +20324,8 @@ var _concourse$atc$Pipeline$constrainedInputNode = F4(
 			return _elm_lang$core$Native_Utils.crashCase(
 				'Pipeline',
 				{
-					start: {line: 262, column: 3},
-					end: {line: 271, column: 70}
+					start: {line: 285, column: 3},
+					end: {line: 294, column: 70}
 				},
 				_p17)('impossible: job name not found; invalid pipeline?');
 		}
@@ -20084,8 +20388,8 @@ var _concourse$atc$Pipeline$jobId = F2(
 			return _elm_lang$core$Native_Utils.crashCase(
 				'Pipeline',
 				{
-					start: {line: 292, column: 3},
-					end: {line: 297, column: 52}
+					start: {line: 315, column: 3},
+					end: {line: 320, column: 52}
 				},
 				_p24)('impossible: job index not found');
 		}
@@ -20164,35 +20468,55 @@ var _concourse$atc$Pipeline$initGraph = function (jobs) {
 var _concourse$atc$Pipeline$update = F2(
 	function (msg, model) {
 		var _p30 = msg;
-		if (_p30.ctor === 'Noop') {
-			return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
-		} else {
-			if (_p30._0.ctor === 'Ok') {
-				var _p31 = _p30._0._0;
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{
-							jobs: _p31,
-							graph: _concourse$atc$Pipeline$initGraph(_p31)
-						}),
-					_1: _elm_lang$core$Platform_Cmd$none
-				};
-			} else {
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{
-							error: _elm_lang$core$Maybe$Just(
-								_elm_lang$core$Basics$toString(_p30._0._0))
-						}),
-					_1: _elm_lang$core$Platform_Cmd$none
-				};
-			}
+		switch (_p30.ctor) {
+			case 'Noop':
+				return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+			case 'JobsFetched':
+				if (_p30._0.ctor === 'Ok') {
+					var filtered = _p30._0._0;
+					return {
+						ctor: '_Tuple2',
+						_0: _elm_lang$core$Native_Utils.update(
+							model,
+							{
+								jobs: filtered,
+								graph: _concourse$atc$Pipeline$initGraph(filtered)
+							}),
+						_1: _elm_lang$core$Platform_Cmd$none
+					};
+				} else {
+					return {
+						ctor: '_Tuple2',
+						_0: _elm_lang$core$Native_Utils.update(
+							model,
+							{
+								error: _elm_lang$core$Maybe$Just(
+									_elm_lang$core$Basics$toString(_p30._0._0))
+							}),
+						_1: _elm_lang$core$Platform_Cmd$none
+					};
+				}
+			default:
+				var _p31 = model.fit;
+				if (_p31.ctor === 'Just') {
+					return {
+						ctor: '_Tuple2',
+						_0: _elm_lang$core$Native_Utils.update(
+							model,
+							{fit: _elm_lang$core$Maybe$Nothing}),
+						_1: _p31._0(
+							{ctor: '_Tuple0'})
+					};
+				} else {
+					return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+				}
 		}
 	});
+var _concourse$atc$Pipeline$Frame = {ctor: 'Frame'};
+var _concourse$atc$Pipeline$subscriptions = function (model) {
+	return (_elm_lang$core$List$isEmpty(model.jobs) || _elm_lang$core$Native_Utils.eq(model.fit, _elm_lang$core$Maybe$Nothing)) ? _elm_lang$core$Platform_Sub$none : _elm_lang$animation_frame$AnimationFrame$times(
+		_elm_lang$core$Basics$always(_concourse$atc$Pipeline$Frame));
+};
 var _concourse$atc$Pipeline$JobsFetched = function (a) {
 	return {ctor: 'JobsFetched', _0: a};
 };
@@ -20206,28 +20530,35 @@ var _concourse$atc$Pipeline$fetchJobs = function (locator) {
 			_elm_lang$core$Result$Ok,
 			_concourse$atc$Concourse_Job$fetchJobs(locator)));
 };
-var _concourse$atc$Pipeline$init = function (flags) {
-	return {
-		ctor: '_Tuple2',
-		_0: {
-			pipelineLocator: flags,
-			jobs: _elm_lang$core$Native_List.fromArray(
-				[]),
-			graph: _elm_community$graph$Graph$empty,
-			error: _elm_lang$core$Maybe$Nothing
-		},
-		_1: _concourse$atc$Pipeline$fetchJobs(flags)
-	};
-};
+var _concourse$atc$Pipeline$init = F2(
+	function (fit, flags) {
+		return {
+			ctor: '_Tuple2',
+			_0: {
+				fit: _elm_lang$core$Maybe$Just(fit),
+				pipelineLocator: flags,
+				jobs: _elm_lang$core$Native_List.fromArray(
+					[]),
+				graph: _elm_community$graph$Graph$empty,
+				error: _elm_lang$core$Maybe$Nothing
+			},
+			_1: _concourse$atc$Pipeline$fetchJobs(flags)
+		};
+	});
 var _concourse$atc$Pipeline$Noop = {ctor: 'Noop'};
 
+var _concourse$atc$PipelinePage$fit = _elm_lang$core$Native_Platform.outgoingPort(
+	'fit',
+	function (v) {
+		return null;
+	});
 var _concourse$atc$PipelinePage$main = {
 	main: _elm_lang$html$Html_App$programWithFlags(
 		{
-			init: _concourse$atc$Pipeline$init,
+			init: _concourse$atc$Pipeline$init(_concourse$atc$PipelinePage$fit),
 			update: _concourse$atc$Pipeline$update,
 			view: _concourse$atc$Pipeline$view,
-			subscriptions: _elm_lang$core$Basics$always(_elm_lang$core$Platform_Sub$none)
+			subscriptions: _concourse$atc$Pipeline$subscriptions
 		}),
 	flags: A2(
 		_elm_lang$core$Json_Decode$andThen,

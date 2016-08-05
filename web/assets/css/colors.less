@@ -122,6 +122,26 @@ span.error { color: @base08; }
 
 }
 
+.node {
+  z-index: 10;
+}
+
+// #node-3.job {
+//   z-index: 5;
+//   a {
+//     border-radius: 1px;
+//     .ripple-animation("medium-pending-ripples-concourse", 7px, @base0A);
+//   }
+// }
+
+#node-26.job a, #node-2.job a {
+  background: @base08;
+}
+
+#node-27.job a {
+  background: @base03;
+}
+
 .failed-outline(@blue-radius, @red-radius) {
   box-shadow: 0 0 0 @blue-radius @base01, 0 0 0 @blue-radius + @red-radius fade(@base08, 70%)
 }

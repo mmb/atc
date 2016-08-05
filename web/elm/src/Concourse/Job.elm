@@ -18,6 +18,7 @@ type alias Job =
   , disableManualTrigger : Bool
   , inputs : List Input
   , outputs : List Output
+  , groups : List String
   }
 
 type alias Input =
@@ -61,6 +62,7 @@ decode teamName pipelineName =
     |: (optional False <| Json.Decode.maybe ("disable_manual_trigger" := Json.Decode.bool))
     |: (optional [] <| Json.Decode.maybe ("inputs" := Json.Decode.list decodeInput))
     |: (optional [] <| Json.Decode.maybe ("outputs" := Json.Decode.list decodeOutput))
+    |: (optional [] <| Json.Decode.maybe ("groups" := Json.Decode.list Json.Decode.string))
 
 decodeInput : Json.Decode.Decoder Input
 decodeInput =

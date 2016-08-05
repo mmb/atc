@@ -5,14 +5,36 @@
 
 <script src="{{asset "jquery-2.1.1.min.js"}}"></script>
 <script src="{{asset "concourse.js"}}"></script>
+<script src="{{asset "fit.min.js"}}"></script>
 <script src="{{asset "elm.min.js"}}"></script>
 <script type="text/javascript">
 concourse.pipelineName = "{{.PipelineName}}"; // used for detecting if the pipeline is paused
 
 var node = document.getElementById("elm-app");
-Elm.PipelinePage.embed(node, {
+var app = Elm.PipelinePage.embed(node, {
   teamName: {{.TeamName}},
   pipelineName: {{.PipelineName}}
+});
+
+var watcher;
+
+app.ports.fit.subscribe(function() {
+  if (watcher !== undefined) {
+    watcher.trigger();
+    return;
+  }
+
+  document.querySelector(".pipeline-grid").style.display = 'block';
+
+  watcher = fit(
+    document.querySelector(".pipeline-grid"),
+    document.querySelector("#elm-app"),
+    {
+      watch: true,
+      hAlign: fit.CENTER,
+      vAlign: fit.CENTER
+    }
+  );
 });
 </script>
 {{end}}
