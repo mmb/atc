@@ -75,20 +75,20 @@ view model =
       Html.text ("error: " ++ msg)
 
     Nothing ->
-      Html.table [class "pipeline-table"] (
-        model.graph
-          |> Grid.fromGraph
-          |> Grid.toMatrix nodeHeight
-          |> Matrix.toList
-          |> List.map viewRow
-      )
-      -- Html.div [class "pipeline-gird"] [
-      --   viewGrid (Grid.fromGraph model.graph)
-      -- ]
+      -- Html.table [class "pipeline-table"] (
+      --   model.graph
+      --     |> Grid.fromGraph
+      --     |> Grid.toMatrix nodeHeight
+      --     |> Matrix.toList
+      --     |> List.map viewRow
+      -- )
+      Html.div [class "pipeline-grid"] [
+        viewGrid (Grid.fromGraph model.graph)
+      ]
 
-nodeHeight : Graph.NodeContext Node () -> Int
-nodeHeight {node} =
-  case node.label of
+nodeHeight : Graph.Node Node -> Int
+nodeHeight {label} =
+  case label of
     JobNode job ->
       max 1 (jobResources job)
 
@@ -106,9 +106,9 @@ viewMatrixCell mnode =
     Grid.MatrixSpacer ->
       Html.td [class "spacer"] []
 
-    Grid.MatrixNode node ->
+    Grid.MatrixNode {node} ->
       Html.td [rowspan (nodeHeight node)] [
-        viewGraphNode node
+        viewNode node
       ]
 
     Grid.MatrixFilled ->
@@ -117,8 +117,8 @@ viewMatrixCell mnode =
 viewGrid : Grid Node () -> Html Msg
 viewGrid grid =
   case grid of
-    Grid.Cell node ->
-      viewGraphNode node
+    Grid.Cell {node} ->
+      viewNode node
 
     Grid.Serial prev next ->
       Html.div [class "serial-grid"]
@@ -140,34 +140,32 @@ viewSerial grid =
     _ ->
       [viewGrid grid]
 
-viewGraph : Graph Node () -> Html Msg
-viewGraph graph =
-  Html.div [class "ranks"] <|
-    List.map viewGraphRank (Graph.heightLevels graph)
+viewNode : Graph.Node Node -> Html Msg
+viewNode {id,label} =
+  let
+    idAttr =
+      Html.Attributes.id ("node-" ++ toString id)
+  in
+    case label of
+      JobNode job ->
+        Html.div [class "node job", idAttr] [
+          viewJobNode job
+        ]
 
-viewGraphRank : List (Graph.NodeContext Node ()) -> Html Msg
-viewGraphRank ncs =
-  Html.div [class "rank"] <|
-    List.map viewGraphNode ncs
+      InputNode {resourceName} ->
+        Html.div [class "node input", idAttr] [
+          viewInputNode resourceName
+        ]
 
-viewGraphNode : Graph.NodeContext Node () -> Html Msg
-viewGraphNode nc =
-  Html.div [class "node", Html.Attributes.id ("node-" ++ toString nc.node.id)] [viewNode nc.node.label]
+      ConstrainedInputNode {resourceName} ->
+        Html.div [class "node input constrained", idAttr] [
+          viewConstrainedInputNode resourceName
+        ]
 
-viewNode : Node -> Html Msg
-viewNode node =
-  case node of
-    JobNode job ->
-      viewJobNode job
-
-    InputNode {resourceName} ->
-      viewInputNode resourceName
-
-    ConstrainedInputNode {resourceName} ->
-      viewConstrainedInputNode resourceName
-
-    OutputNode {resourceName} ->
-      viewOutputNode resourceName
+      OutputNode {resourceName} ->
+        Html.div [class "node output", idAttr] [
+          viewOutputNode resourceName
+        ]
 
 viewJobNode : Job -> Html Msg
 viewJobNode job =
@@ -194,7 +192,7 @@ viewJobNode job =
           , href job.url
           ]
   in
-    Html.a (style [("line-height", toString (30 * jobResources job - 10) ++ "px")] :: linkAttrs) [
+    Html.a linkAttrs [ --(style [("line-height", toString (30 * jobResources job - 10) ++ "px")] :: linkAttrs) [
       Html.text job.name
     ]
 
@@ -204,21 +202,15 @@ jobResources {inputs,outputs} =
 
 viewInputNode : String -> Html Msg
 viewInputNode resourceName =
-  Html.div [class "resource-node"] [
-    Html.a [class "input", href "#"] [Html.text resourceName]
-  ]
+  Html.a [href "#"] [Html.text resourceName]
 
 viewConstrainedInputNode : String -> Html Msg
 viewConstrainedInputNode resourceName =
-  Html.div [class "resource-node"] [
-    Html.a [class "input constrained", href "#"] [Html.text resourceName]
-  ]
+  Html.a [href "#"] [Html.text resourceName]
 
 viewOutputNode : String -> Html Msg
 viewOutputNode resourceName =
-  Html.div [class "resource-node"] [
-    Html.a [class "output", href "#"] [Html.text resourceName]
-  ]
+  Html.a [href "#"] [Html.text resourceName]
 
 fetchJobs : Concourse.Job.PipelineLocator -> Cmd Msg
 fetchJobs locator =
@@ -262,7 +254,8 @@ inputNodes jobs job {resource,passed} =
 
 outputNodes : Job -> Concourse.Job.Output -> List Node
 outputNodes job {resource} =
-  [OutputNode { resourceName = resource, upstreamJob = job }]
+  []
+  -- [OutputNode { resourceName = resource, upstreamJob = job }]
 
 constrainedInputNode : ByName Job -> String -> Job -> String -> Node
 constrainedInputNode jobs resourceName dependentJob upstreamJobName =
@@ -302,31 +295,3 @@ jobId nodes job =
 
     [] ->
       Debug.crash "impossible: job index not found"
-
-bfsVisitor : List (Graph.NodeContext Node ()) -> Int -> Html Msg -> Html Msg
-bfsVisitor nodes depth children =
-  let
-    _ = Debug.log "debug" (nodes, depth)
-
-    currentNode =
-      case List.head nodes of
-        Just node ->
-          node
-
-        Nothing ->
-          Debug.crash "impossible: no nodes"
-  in
-    Html.div [class "pipeline"] [
-      viewGraphNode currentNode,
-      children
-    ]
-
-dfsVisitor : Graph.NodeContext Node () -> Html Msg -> (Html Msg, Html Msg -> Html Msg)
-dfsVisitor node acc =
-  ( Html.div [class "pipeline"] [
-      viewGraphNode node,
-      acc
-    ]
-  , \finish ->
-    Html.div [Html.Attributes.id ("done-" ++ toString node.node.id)] [finish]
-  )

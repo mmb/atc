@@ -18138,84 +18138,178 @@ var _elm_community$graph$Graph$anyNode = function () {
 	return A2(_evancz$focus$Focus$create, get, update);
 }();
 
+var _concourse$atc$Grid$nodes = function (grid) {
+	var _p0 = grid;
+	switch (_p0.ctor) {
+		case 'End':
+			return _elm_lang$core$Set$empty;
+		case 'Parallel':
+			return A3(
+				_elm_lang$core$List$foldl,
+				F2(
+					function (g, s) {
+						return A2(
+							_elm_lang$core$Set$union,
+							s,
+							_concourse$atc$Grid$nodes(g));
+					}),
+				_elm_lang$core$Set$empty,
+				_p0._0);
+		case 'Serial':
+			return A2(
+				_elm_lang$core$Set$union,
+				_concourse$atc$Grid$nodes(_p0._0),
+				_concourse$atc$Grid$nodes(_p0._1));
+		default:
+			return _elm_lang$core$Set$singleton(_p0._0.node.id);
+	}
+};
+var _concourse$atc$Grid$terminals = function (grid) {
+	var _p1 = grid;
+	switch (_p1.ctor) {
+		case 'End':
+			return _elm_lang$core$Set$empty;
+		case 'Parallel':
+			var _p3 = _p1._0;
+			return A2(
+				_elm_lang$core$List$any,
+				function (_p2) {
+					return _elm_lang$core$Set$isEmpty(
+						_concourse$atc$Grid$terminals(_p2));
+				},
+				_p3) ? _elm_lang$core$Set$empty : A3(
+				_elm_lang$core$List$foldl,
+				F2(
+					function (g, s) {
+						return A2(
+							_elm_lang$core$Set$union,
+							s,
+							_concourse$atc$Grid$terminals(g));
+					}),
+				_elm_lang$core$Set$empty,
+				_p3);
+		case 'Serial':
+			var _p4 = _p1._1;
+			var bNodes = _concourse$atc$Grid$nodes(_p4);
+			var bTerms = _concourse$atc$Grid$terminals(_p4);
+			var aTerms = _concourse$atc$Grid$terminals(_p1._0);
+			var joined = A2(_elm_lang$core$Set$union, aTerms, bTerms);
+			return A2(_elm_lang$core$Set$diff, joined, bNodes);
+		default:
+			return _elm_lang$core$Set$fromList(
+				_elm_community$intdict$IntDict$keys(_p1._0.outgoing));
+	}
+};
 var _concourse$atc$Grid$comesDirectlyFrom = F2(
-	function (nc, grid) {
+	function (up, grid) {
 		comesDirectlyFrom:
 		while (true) {
-			var _p0 = grid;
-			switch (_p0.ctor) {
+			var _p5 = grid;
+			switch (_p5.ctor) {
 				case 'End':
 					return false;
 				case 'Parallel':
 					return A2(
 						_elm_lang$core$List$any,
-						_concourse$atc$Grid$comesDirectlyFrom(nc),
-						_p0._0);
+						_concourse$atc$Grid$comesDirectlyFrom(up),
+						_p5._0);
 				case 'Serial':
-					var _v1 = nc,
-						_v2 = _p0._0;
-					nc = _v1;
-					grid = _v2;
+					var _v3 = up,
+						_v4 = _p5._0;
+					up = _v3;
+					grid = _v4;
 					continue comesDirectlyFrom;
 				default:
-					return A2(_elm_community$intdict$IntDict$member, nc.node.id, _p0._0.incoming);
+					return A2(
+						_elm_lang$core$Set$member,
+						_p5._0.node.id,
+						_concourse$atc$Grid$terminals(up));
 			}
 		}
 	});
 var _concourse$atc$Grid$leadsTo = F2(
 	function (nc, grid) {
-		var _p1 = grid;
-		switch (_p1.ctor) {
+		var _p6 = grid;
+		switch (_p6.ctor) {
 			case 'End':
 				return false;
 			case 'Parallel':
 				return A2(
 					_elm_lang$core$List$any,
 					_concourse$atc$Grid$leadsTo(nc),
-					_p1._0);
+					_p6._0);
 			case 'Serial':
-				return A2(_concourse$atc$Grid$leadsTo, nc, _p1._0) || A2(_concourse$atc$Grid$leadsTo, nc, _p1._1);
+				return A2(_concourse$atc$Grid$leadsTo, nc, _p6._0) || A2(_concourse$atc$Grid$leadsTo, nc, _p6._1);
 			default:
-				return A2(_elm_community$intdict$IntDict$member, nc.node.id, _p1._0.outgoing);
+				return A2(_elm_community$intdict$IntDict$member, nc.node.id, _p6._0.outgoing);
 		}
 	});
 var _concourse$atc$Grid$height = F2(
 	function (nh, grid) {
-		var _p2 = grid;
-		switch (_p2.ctor) {
+		var _p7 = grid;
+		switch (_p7.ctor) {
 			case 'End':
 				return 0;
 			case 'Serial':
 				return A2(
 					_elm_lang$core$Basics$max,
-					A2(_concourse$atc$Grid$height, nh, _p2._0),
-					A2(_concourse$atc$Grid$height, nh, _p2._1));
+					A2(_concourse$atc$Grid$height, nh, _p7._0),
+					A2(_concourse$atc$Grid$height, nh, _p7._1));
 			case 'Parallel':
 				return _elm_lang$core$List$sum(
 					A2(
 						_elm_lang$core$List$map,
 						_concourse$atc$Grid$height(nh),
-						_p2._0));
+						_p7._0));
 			default:
-				return nh(_p2._0);
+				return nh(_p7._0);
 		}
 	});
 var _concourse$atc$Grid$width = function (grid) {
-	var _p3 = grid;
-	switch (_p3.ctor) {
+	var _p8 = grid;
+	switch (_p8.ctor) {
 		case 'End':
 			return 0;
 		case 'Serial':
-			return _concourse$atc$Grid$width(_p3._0) + _concourse$atc$Grid$width(_p3._1);
+			return _concourse$atc$Grid$width(_p8._0) + _concourse$atc$Grid$width(_p8._1);
 		case 'Parallel':
 			return A2(
 				_elm_lang$core$Maybe$withDefault,
 				0,
 				_elm_lang$core$List$maximum(
-					A2(_elm_lang$core$List$map, _concourse$atc$Grid$width, _p3._0)));
+					A2(_elm_lang$core$List$map, _concourse$atc$Grid$width, _p8._0)));
 		default:
 			return 1;
 	}
+};
+var _concourse$atc$Grid$showMatrix = function (m) {
+	var showCell = function (c) {
+		var _p9 = c;
+		switch (_p9.ctor) {
+			case 'MatrixSpacer':
+				return '  ';
+			case 'MatrixFilled':
+				return '--';
+			default:
+				var _p10 = _p9._0;
+				return (_elm_lang$core$Native_Utils.cmp(_p10.node.id, 10) < 0) ? A2(
+					_elm_lang$core$Basics_ops['++'],
+					' ',
+					_elm_lang$core$Basics$toString(_p10.node.id)) : _elm_lang$core$Basics$toString(_p10.node.id);
+		}
+	};
+	return A2(
+		_elm_lang$core$String$join,
+		'\n',
+		A2(
+			_elm_lang$core$List$map,
+			function (r) {
+				return A2(
+					_elm_lang$core$String$join,
+					'|',
+					A2(_elm_lang$core$List$map, showCell, r));
+			},
+			_chendrix$elm_matrix$Matrix$toList(m)));
 };
 var _concourse$atc$Grid$End = {ctor: 'End'};
 var _concourse$atc$Grid$Parallel = function (a) {
@@ -18223,29 +18317,29 @@ var _concourse$atc$Grid$Parallel = function (a) {
 };
 var _concourse$atc$Grid$addToStart = F2(
 	function (a, b) {
-		var _p4 = b;
-		switch (_p4.ctor) {
+		var _p11 = b;
+		switch (_p11.ctor) {
 			case 'End':
 				return a;
 			case 'Parallel':
-				var _p6 = _p4._0;
-				var _p5 = a;
-				if (_p5.ctor === 'Parallel') {
+				var _p13 = _p11._0;
+				var _p12 = a;
+				if (_p12.ctor === 'Parallel') {
 					return _concourse$atc$Grid$Parallel(
-						A2(_elm_lang$core$Basics_ops['++'], _p6, _p5._0));
+						A2(_elm_lang$core$Basics_ops['++'], _p13, _p12._0));
 				} else {
 					return _concourse$atc$Grid$Parallel(
 						A2(
 							_elm_lang$core$Basics_ops['++'],
-							_p6,
+							_p13,
 							_elm_lang$core$Native_List.fromArray(
 								[a])));
 				}
 			default:
-				var _p7 = a;
-				if (_p7.ctor === 'Parallel') {
+				var _p14 = a;
+				if (_p14.ctor === 'Parallel') {
 					return _concourse$atc$Grid$Parallel(
-						A2(_elm_lang$core$List_ops['::'], b, _p7._0));
+						A2(_elm_lang$core$List_ops['::'], b, _p14._0));
 				} else {
 					return _concourse$atc$Grid$Parallel(
 						_elm_lang$core$Native_List.fromArray(
@@ -18255,8 +18349,8 @@ var _concourse$atc$Grid$addToStart = F2(
 	});
 var _concourse$atc$Grid$extractExclusiveUpstreams = F2(
 	function (target, grid) {
-		var _p8 = grid;
-		switch (_p8.ctor) {
+		var _p15 = grid;
+		switch (_p15.ctor) {
 			case 'End':
 				return {
 					ctor: '_Tuple2',
@@ -18268,7 +18362,7 @@ var _concourse$atc$Grid$extractExclusiveUpstreams = F2(
 				var recurse = A2(
 					_elm_lang$core$List$map,
 					_concourse$atc$Grid$extractExclusiveUpstreams(target),
-					_p8._0);
+					_p15._0);
 				var remainders = A2(_elm_lang$core$List$map, _elm_lang$core$Basics$fst, recurse);
 				var exclusives = A2(_elm_lang$core$List$concatMap, _elm_lang$core$Basics$snd, recurse);
 				return A2(
@@ -18285,21 +18379,29 @@ var _concourse$atc$Grid$extractExclusiveUpstreams = F2(
 					_1: exclusives
 				};
 			case 'Serial':
-				return {
+				var terms = _concourse$atc$Grid$terminals(grid);
+				return (_elm_lang$core$Native_Utils.eq(
+					_elm_lang$core$Set$size(terms),
+					1) && A2(_elm_lang$core$Set$member, target.node.id, terms)) ? {
+					ctor: '_Tuple2',
+					_0: _elm_lang$core$Maybe$Nothing,
+					_1: _elm_lang$core$Native_List.fromArray(
+						[grid])
+				} : {
 					ctor: '_Tuple2',
 					_0: _elm_lang$core$Maybe$Just(grid),
 					_1: _elm_lang$core$Native_List.fromArray(
 						[])
 				};
 			default:
-				var _p9 = _p8._0;
+				var _p16 = _p15._0;
 				return (_elm_lang$core$Native_Utils.eq(
-					_elm_community$intdict$IntDict$size(_p9.outgoing),
-					1) && A2(_elm_community$intdict$IntDict$member, target.node.id, _p9.outgoing)) ? {
+					_elm_community$intdict$IntDict$size(_p16.outgoing),
+					1) && A2(_elm_community$intdict$IntDict$member, target.node.id, _p16.outgoing)) ? {
 					ctor: '_Tuple2',
 					_0: _elm_lang$core$Maybe$Nothing,
 					_1: _elm_lang$core$Native_List.fromArray(
-						[_p9])
+						[grid])
 				} : {
 					ctor: '_Tuple2',
 					_0: _elm_lang$core$Maybe$Just(grid),
@@ -18312,73 +18414,90 @@ var _concourse$atc$Grid$Serial = F2(
 	function (a, b) {
 		return {ctor: 'Serial', _0: a, _1: b};
 	});
-var _concourse$atc$Grid$Cell = function (a) {
-	return {ctor: 'Cell', _0: a};
-};
 var _concourse$atc$Grid$addBeforeDownstream = F2(
-	function (nc, grid) {
-		var _p10 = grid;
-		switch (_p10.ctor) {
+	function (up, grid) {
+		var _p17 = grid;
+		switch (_p17.ctor) {
 			case 'End':
 				return _concourse$atc$Grid$End;
 			case 'Parallel':
-				return A2(_concourse$atc$Grid$comesDirectlyFrom, nc, grid) ? A2(
-					_concourse$atc$Grid$Serial,
-					_concourse$atc$Grid$Cell(nc),
-					grid) : _concourse$atc$Grid$Parallel(
-					A2(
-						_elm_lang$core$List$map,
-						_concourse$atc$Grid$addBeforeDownstream(nc),
-						_p10._0));
-			case 'Serial':
-				var _p12 = _p10._1;
-				var _p11 = _p10._0;
-				return A2(_concourse$atc$Grid$comesDirectlyFrom, nc, _p12) ? A2(
-					_concourse$atc$Grid$Serial,
-					A2(
-						_concourse$atc$Grid$addToStart,
-						_concourse$atc$Grid$Cell(nc),
-						_p11),
-					_p12) : A2(
-					_concourse$atc$Grid$Serial,
-					_p11,
-					A2(_concourse$atc$Grid$addBeforeDownstream, nc, _p12));
-			default:
-				return A2(_concourse$atc$Grid$comesDirectlyFrom, nc, grid) ? _elm_lang$core$Native_Utils.crash(
+				return A2(_concourse$atc$Grid$comesDirectlyFrom, up, grid) ? _elm_lang$core$Native_Utils.crash(
 					'Grid',
 					{
-						start: {line: 188, column: 9},
-						end: {line: 188, column: 20}
+						start: {line: 208, column: 9},
+						end: {line: 208, column: 20}
+					})('too late to add in front of Parallel') : _concourse$atc$Grid$Parallel(
+					A2(
+						_elm_lang$core$List$map,
+						_concourse$atc$Grid$addBeforeDownstream(up),
+						_p17._0));
+			case 'Serial':
+				var _p19 = _p17._1;
+				var _p18 = _p17._0;
+				return A2(_concourse$atc$Grid$comesDirectlyFrom, up, _p18) ? _elm_lang$core$Native_Utils.crash(
+					'Grid',
+					{
+						start: {line: 214, column: 9},
+						end: {line: 214, column: 20}
+					})('too late to add in front of Serial') : (A2(_concourse$atc$Grid$comesDirectlyFrom, up, _p19) ? A2(
+					_concourse$atc$Grid$Serial,
+					A2(_concourse$atc$Grid$addToStart, up, _p18),
+					_p19) : A2(
+					_concourse$atc$Grid$Serial,
+					_p18,
+					A2(_concourse$atc$Grid$addBeforeDownstream, up, _p19)));
+			default:
+				return A2(_concourse$atc$Grid$comesDirectlyFrom, up, grid) ? _elm_lang$core$Native_Utils.crash(
+					'Grid',
+					{
+						start: {line: 222, column: 9},
+						end: {line: 222, column: 20}
 					})('too late to add in front of Cell') : grid;
 		}
 	});
+var _concourse$atc$Grid$checkAndAddBeforeDownstream = F2(
+	function (up, grid) {
+		var after = A2(_concourse$atc$Grid$addBeforeDownstream, up, grid);
+		return _elm_lang$core$Native_Utils.eq(after, grid) ? _elm_lang$core$Native_Utils.crash(
+			'Grid',
+			{
+				start: {line: 196, column: 7},
+				end: {line: 196, column: 18}
+			})(
+			A2(
+				_elm_lang$core$Basics_ops['++'],
+				'failed to add: ',
+				_elm_lang$core$Basics$toString(up))) : after;
+	});
+var _concourse$atc$Grid$Cell = function (a) {
+	return {ctor: 'Cell', _0: a};
+};
 var _concourse$atc$Grid$addAfterMixedUpstreamsAndReinsertExclusiveOnes = F2(
 	function (nc, dependent) {
-		var _p13 = A2(
+		var _p20 = A2(
 			_concourse$atc$Grid$extractExclusiveUpstreams,
 			nc,
 			_concourse$atc$Grid$Parallel(dependent));
-		var remainder = _p13._0;
-		var exclusives = _p13._1;
-		var _p14 = {ctor: '_Tuple2', _0: remainder, _1: exclusives};
-		if (_p14._0.ctor === 'Nothing') {
-			if (_p14._1.ctor === '[]') {
+		var remainder = _p20._0;
+		var exclusives = _p20._1;
+		var _p21 = {ctor: '_Tuple2', _0: remainder, _1: exclusives};
+		if (_p21._0.ctor === 'Nothing') {
+			if (_p21._1.ctor === '[]') {
 				return _elm_lang$core$Native_Utils.crashCase(
 					'Grid',
 					{
-						start: {line: 152, column: 5},
-						end: {line: 166, column: 21}
+						start: {line: 173, column: 5},
+						end: {line: 187, column: 21}
 					},
-					_p14)('impossible');
+					_p21)('impossible');
 			} else {
 				return A2(
 					_concourse$atc$Grid$Serial,
-					_concourse$atc$Grid$Parallel(
-						A2(_elm_lang$core$List$map, _concourse$atc$Grid$Cell, exclusives)),
+					_concourse$atc$Grid$Parallel(exclusives),
 					_concourse$atc$Grid$Cell(nc));
 			}
 		} else {
-			if (_p14._1.ctor === '[]') {
+			if (_p21._1.ctor === '[]') {
 				return A2(
 					_concourse$atc$Grid$Serial,
 					_concourse$atc$Grid$Parallel(dependent),
@@ -18386,34 +18505,34 @@ var _concourse$atc$Grid$addAfterMixedUpstreamsAndReinsertExclusiveOnes = F2(
 			} else {
 				return A3(
 					_elm_lang$core$List$foldr,
-					_concourse$atc$Grid$addBeforeDownstream,
-					A2(_concourse$atc$Grid$addAfterUpstreams, nc, _p14._0._0),
+					_concourse$atc$Grid$checkAndAddBeforeDownstream,
+					A2(_concourse$atc$Grid$addAfterUpstreams, nc, _p21._0._0),
 					exclusives);
 			}
 		}
 	});
 var _concourse$atc$Grid$addAfterUpstreams = F2(
 	function (nc, grid) {
-		var _p16 = grid;
-		switch (_p16.ctor) {
+		var _p23 = grid;
+		switch (_p23.ctor) {
 			case 'End':
 				return _concourse$atc$Grid$End;
 			case 'Parallel':
-				var _p17 = A2(
+				var _p24 = A2(
 					_elm_lang$core$List$partition,
 					_concourse$atc$Grid$leadsTo(nc),
-					_p16._0);
-				var dependent = _p17._0;
-				var rest = _p17._1;
-				var _p18 = dependent;
-				if (_p18.ctor === '[]') {
+					_p23._0);
+				var dependent = _p24._0;
+				var rest = _p24._1;
+				var _p25 = dependent;
+				if (_p25.ctor === '[]') {
 					return grid;
 				} else {
-					if (_p18._1.ctor === '[]') {
+					if (_p25._1.ctor === '[]') {
 						return _concourse$atc$Grid$Parallel(
 							A2(
 								_elm_lang$core$List_ops['::'],
-								A2(_concourse$atc$Grid$addAfterUpstreams, nc, _p18._0),
+								A2(_concourse$atc$Grid$addAfterUpstreams, nc, _p25._0),
 								rest));
 					} else {
 						return A2(
@@ -18423,20 +18542,20 @@ var _concourse$atc$Grid$addAfterUpstreams = F2(
 					}
 				}
 			case 'Serial':
-				var _p20 = _p16._1;
-				var _p19 = _p16._0;
-				return A2(_concourse$atc$Grid$leadsTo, nc, _p19) ? A2(
+				var _p27 = _p23._1;
+				var _p26 = _p23._0;
+				return A2(_concourse$atc$Grid$leadsTo, nc, _p26) ? A2(
 					_concourse$atc$Grid$Serial,
-					_p19,
+					_p26,
 					A2(
 						_concourse$atc$Grid$addToStart,
 						_concourse$atc$Grid$Cell(nc),
-						_p20)) : A2(
+						_p27)) : A2(
 					_concourse$atc$Grid$Serial,
-					_p19,
-					A2(_concourse$atc$Grid$addAfterUpstreams, nc, _p20));
+					_p26,
+					A2(_concourse$atc$Grid$addAfterUpstreams, nc, _p27));
 			default:
-				return A2(_elm_community$intdict$IntDict$member, nc.node.id, _p16._0.outgoing) ? A2(
+				return A2(_elm_community$intdict$IntDict$member, nc.node.id, _p23._0.outgoing) ? A2(
 					_concourse$atc$Grid$Serial,
 					grid,
 					_concourse$atc$Grid$Cell(nc)) : grid;
@@ -18444,8 +18563,8 @@ var _concourse$atc$Grid$addAfterUpstreams = F2(
 	});
 var _concourse$atc$Grid$insert = F2(
 	function (nc, grid) {
-		var _p21 = _elm_community$intdict$IntDict$size(nc.incoming);
-		if (_p21 === 0) {
+		var _p28 = _elm_community$intdict$IntDict$size(nc.incoming);
+		if (_p28 === 0) {
 			return A2(
 				_concourse$atc$Grid$addToStart,
 				_concourse$atc$Grid$Cell(nc),
@@ -18470,18 +18589,18 @@ var _concourse$atc$Grid$clearHeight = F4(
 			if (_elm_lang$core$Native_Utils.eq(height, 0)) {
 				return matrix;
 			} else {
-				var _v15 = row,
-					_v16 = col,
-					_v17 = height - 1,
-					_v18 = A3(
+				var _v18 = row,
+					_v19 = col,
+					_v20 = height - 1,
+					_v21 = A3(
 					_chendrix$elm_matrix$Matrix$set,
 					{ctor: '_Tuple2', _0: row + height, _1: col},
 					_concourse$atc$Grid$MatrixFilled,
 					matrix);
-				row = _v15;
-				col = _v16;
-				height = _v17;
-				matrix = _v18;
+				row = _v18;
+				col = _v19;
+				height = _v20;
+				matrix = _v21;
 				continue clearHeight;
 			}
 		}
@@ -18494,50 +18613,50 @@ var _concourse$atc$Grid$toMatrix$ = F5(
 	function (nh, row, col, matrix, grid) {
 		toMatrix$:
 		while (true) {
-			var _p22 = grid;
-			switch (_p22.ctor) {
+			var _p29 = grid;
+			switch (_p29.ctor) {
 				case 'End':
 					return matrix;
 				case 'Serial':
-					var _p23 = _p22._0;
-					var _v20 = nh,
-						_v21 = row,
-						_v22 = col + _concourse$atc$Grid$width(_p23),
-						_v23 = A5(_concourse$atc$Grid$toMatrix$, nh, row, col, matrix, _p23),
-						_v24 = _p22._1;
-					nh = _v20;
-					row = _v21;
-					col = _v22;
-					matrix = _v23;
-					grid = _v24;
+					var _p30 = _p29._0;
+					var _v23 = nh,
+						_v24 = row,
+						_v25 = col + _concourse$atc$Grid$width(_p30),
+						_v26 = A5(_concourse$atc$Grid$toMatrix$, nh, row, col, matrix, _p30),
+						_v27 = _p29._1;
+					nh = _v23;
+					row = _v24;
+					col = _v25;
+					matrix = _v26;
+					grid = _v27;
 					continue toMatrix$;
 				case 'Parallel':
 					return _elm_lang$core$Basics$fst(
 						A3(
 							_elm_lang$core$List$foldl,
 							F2(
-								function (g, _p24) {
-									var _p25 = _p24;
-									var _p26 = _p25._1;
+								function (g, _p31) {
+									var _p32 = _p31;
+									var _p33 = _p32._1;
 									return {
 										ctor: '_Tuple2',
-										_0: A5(_concourse$atc$Grid$toMatrix$, nh, _p26, col, _p25._0, g),
-										_1: _p26 + A2(_concourse$atc$Grid$height, nh, g)
+										_0: A5(_concourse$atc$Grid$toMatrix$, nh, _p33, col, _p32._0, g),
+										_1: _p33 + A2(_concourse$atc$Grid$height, nh, g)
 									};
 								}),
 							{ctor: '_Tuple2', _0: matrix, _1: row},
-							_p22._0));
+							_p29._0));
 				default:
-					var _p27 = _p22._0;
+					var _p34 = _p29._0;
 					return A3(
 						_chendrix$elm_matrix$Matrix$set,
 						{ctor: '_Tuple2', _0: row, _1: col},
-						_concourse$atc$Grid$MatrixNode(_p27),
+						_concourse$atc$Grid$MatrixNode(_p34),
 						A4(
 							_concourse$atc$Grid$clearHeight,
 							row,
 							col,
-							nh(_p27) - 1,
+							nh(_p34) - 1,
 							matrix));
 			}
 		}
@@ -19604,74 +19723,50 @@ var _concourse$atc$JobPage$main = {
 		})
 };
 
+var _concourse$atc$Pipeline$outputNodes = F2(
+	function (job, _p0) {
+		var _p1 = _p0;
+		return _elm_lang$core$Native_List.fromArray(
+			[]);
+	});
 var _concourse$atc$Pipeline$viewOutputNode = function (resourceName) {
 	return A2(
-		_elm_lang$html$Html$div,
+		_elm_lang$html$Html$a,
 		_elm_lang$core$Native_List.fromArray(
 			[
-				_elm_lang$html$Html_Attributes$class('resource-node')
+				_elm_lang$html$Html_Attributes$href('#')
 			]),
 		_elm_lang$core$Native_List.fromArray(
 			[
-				A2(
-				_elm_lang$html$Html$a,
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$html$Html_Attributes$class('output'),
-						_elm_lang$html$Html_Attributes$href('#')
-					]),
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$html$Html$text(resourceName)
-					]))
+				_elm_lang$html$Html$text(resourceName)
 			]));
 };
 var _concourse$atc$Pipeline$viewConstrainedInputNode = function (resourceName) {
 	return A2(
-		_elm_lang$html$Html$div,
+		_elm_lang$html$Html$a,
 		_elm_lang$core$Native_List.fromArray(
 			[
-				_elm_lang$html$Html_Attributes$class('resource-node')
+				_elm_lang$html$Html_Attributes$href('#')
 			]),
 		_elm_lang$core$Native_List.fromArray(
 			[
-				A2(
-				_elm_lang$html$Html$a,
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$html$Html_Attributes$class('input constrained'),
-						_elm_lang$html$Html_Attributes$href('#')
-					]),
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$html$Html$text(resourceName)
-					]))
+				_elm_lang$html$Html$text(resourceName)
 			]));
 };
 var _concourse$atc$Pipeline$viewInputNode = function (resourceName) {
 	return A2(
-		_elm_lang$html$Html$div,
+		_elm_lang$html$Html$a,
 		_elm_lang$core$Native_List.fromArray(
 			[
-				_elm_lang$html$Html_Attributes$class('resource-node')
+				_elm_lang$html$Html_Attributes$href('#')
 			]),
 		_elm_lang$core$Native_List.fromArray(
 			[
-				A2(
-				_elm_lang$html$Html$a,
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$html$Html_Attributes$class('input'),
-						_elm_lang$html$Html_Attributes$href('#')
-					]),
-				_elm_lang$core$Native_List.fromArray(
-					[
-						_elm_lang$html$Html$text(resourceName)
-					]))
+				_elm_lang$html$Html$text(resourceName)
 			]));
 };
-var _concourse$atc$Pipeline$jobResources = function (_p0) {
-	var _p1 = _p0;
+var _concourse$atc$Pipeline$jobResources = function (_p2) {
+	var _p3 = _p2;
 	return _elm_lang$core$Set$size(
 		_elm_lang$core$Set$fromList(
 			A2(
@@ -19681,43 +19776,43 @@ var _concourse$atc$Pipeline$jobResources = function (_p0) {
 					function (_) {
 						return _.resource;
 					},
-					_p1.inputs),
+					_p3.inputs),
 				A2(
 					_elm_lang$core$List$map,
 					function (_) {
 						return _.resource;
 					},
-					_p1.outputs))));
+					_p3.outputs))));
 };
 var _concourse$atc$Pipeline$viewJobNode = function (job) {
 	var linkAttrs = function () {
-		var _p2 = {ctor: '_Tuple2', _0: job.finishedBuild, _1: job.nextBuild};
-		if (_p2._0.ctor === 'Just') {
-			if (_p2._1.ctor === 'Just') {
+		var _p4 = {ctor: '_Tuple2', _0: job.finishedBuild, _1: job.nextBuild};
+		if (_p4._0.ctor === 'Just') {
+			if (_p4._1.ctor === 'Just') {
 				return _elm_lang$core$Native_List.fromArray(
 					[
 						_elm_lang$html$Html_Attributes$class(
 						A2(
 							_elm_lang$core$Basics_ops['++'],
-							_concourse$atc$Concourse_BuildStatus$show(_p2._0._0.status),
+							_concourse$atc$Concourse_BuildStatus$show(_p4._0._0.status),
 							' started')),
-						_elm_lang$html$Html_Attributes$href(_p2._1._0.url)
+						_elm_lang$html$Html_Attributes$href(_p4._1._0.url)
 					]);
 			} else {
-				var _p3 = _p2._0._0;
+				var _p5 = _p4._0._0;
 				return _elm_lang$core$Native_List.fromArray(
 					[
 						_elm_lang$html$Html_Attributes$class(
-						_concourse$atc$Concourse_BuildStatus$show(_p3.status)),
-						_elm_lang$html$Html_Attributes$href(_p3.url)
+						_concourse$atc$Concourse_BuildStatus$show(_p5.status)),
+						_elm_lang$html$Html_Attributes$href(_p5.url)
 					]);
 			}
 		} else {
-			if (_p2._1.ctor === 'Just') {
+			if (_p4._1.ctor === 'Just') {
 				return _elm_lang$core$Native_List.fromArray(
 					[
 						_elm_lang$html$Html_Attributes$class('no-builds started'),
-						_elm_lang$html$Html_Attributes$href(_p2._1._0.url)
+						_elm_lang$html$Html_Attributes$href(_p4._1._0.url)
 					]);
 			} else {
 				return _elm_lang$core$Native_List.fromArray(
@@ -19730,146 +19825,76 @@ var _concourse$atc$Pipeline$viewJobNode = function (job) {
 	}();
 	return A2(
 		_elm_lang$html$Html$a,
-		A2(
-			_elm_lang$core$List_ops['::'],
-			_elm_lang$html$Html_Attributes$style(
-				_elm_lang$core$Native_List.fromArray(
-					[
-						{
-						ctor: '_Tuple2',
-						_0: 'line-height',
-						_1: A2(
-							_elm_lang$core$Basics_ops['++'],
-							_elm_lang$core$Basics$toString(
-								(30 * _concourse$atc$Pipeline$jobResources(job)) - 10),
-							'px')
-					}
-					])),
-			linkAttrs),
+		linkAttrs,
 		_elm_lang$core$Native_List.fromArray(
 			[
 				_elm_lang$html$Html$text(job.name)
 			]));
 };
-var _concourse$atc$Pipeline$viewNode = function (node) {
-	var _p4 = node;
-	switch (_p4.ctor) {
+var _concourse$atc$Pipeline$viewNode = function (_p6) {
+	var _p7 = _p6;
+	var idAttr = _elm_lang$html$Html_Attributes$id(
+		A2(
+			_elm_lang$core$Basics_ops['++'],
+			'node-',
+			_elm_lang$core$Basics$toString(_p7.id)));
+	var _p8 = _p7.label;
+	switch (_p8.ctor) {
 		case 'JobNode':
-			return _concourse$atc$Pipeline$viewJobNode(_p4._0);
-		case 'InputNode':
-			return _concourse$atc$Pipeline$viewInputNode(_p4._0.resourceName);
-		case 'ConstrainedInputNode':
-			return _concourse$atc$Pipeline$viewConstrainedInputNode(_p4._0.resourceName);
-		default:
-			return _concourse$atc$Pipeline$viewOutputNode(_p4._0.resourceName);
-	}
-};
-var _concourse$atc$Pipeline$viewGraphNode = function (nc) {
-	return A2(
-		_elm_lang$html$Html$div,
-		_elm_lang$core$Native_List.fromArray(
-			[
-				_elm_lang$html$Html_Attributes$class('node'),
-				_elm_lang$html$Html_Attributes$id(
-				A2(
-					_elm_lang$core$Basics_ops['++'],
-					'node-',
-					_elm_lang$core$Basics$toString(nc.node.id)))
-			]),
-		_elm_lang$core$Native_List.fromArray(
-			[
-				_concourse$atc$Pipeline$viewNode(nc.node.label)
-			]));
-};
-var _concourse$atc$Pipeline$bfsVisitor = F3(
-	function (nodes, depth, children) {
-		var currentNode = function () {
-			var _p5 = _elm_lang$core$List$head(nodes);
-			if (_p5.ctor === 'Just') {
-				return _p5._0;
-			} else {
-				return _elm_lang$core$Native_Utils.crashCase(
-					'Pipeline',
-					{
-						start: {line: 312, column: 7},
-						end: {line: 317, column: 45}
-					},
-					_p5)('impossible: no nodes');
-			}
-		}();
-		var _p7 = A2(
-			_elm_lang$core$Debug$log,
-			'debug',
-			{ctor: '_Tuple2', _0: nodes, _1: depth});
-		return A2(
-			_elm_lang$html$Html$div,
-			_elm_lang$core$Native_List.fromArray(
-				[
-					_elm_lang$html$Html_Attributes$class('pipeline')
-				]),
-			_elm_lang$core$Native_List.fromArray(
-				[
-					_concourse$atc$Pipeline$viewGraphNode(currentNode),
-					children
-				]));
-	});
-var _concourse$atc$Pipeline$dfsVisitor = F2(
-	function (node, acc) {
-		return {
-			ctor: '_Tuple2',
-			_0: A2(
+			return A2(
 				_elm_lang$html$Html$div,
 				_elm_lang$core$Native_List.fromArray(
 					[
-						_elm_lang$html$Html_Attributes$class('pipeline')
+						_elm_lang$html$Html_Attributes$class('node job'),
+						idAttr
 					]),
 				_elm_lang$core$Native_List.fromArray(
 					[
-						_concourse$atc$Pipeline$viewGraphNode(node),
-						acc
-					])),
-			_1: function (finish) {
-				return A2(
-					_elm_lang$html$Html$div,
-					_elm_lang$core$Native_List.fromArray(
-						[
-							_elm_lang$html$Html_Attributes$id(
-							A2(
-								_elm_lang$core$Basics_ops['++'],
-								'done-',
-								_elm_lang$core$Basics$toString(node.node.id)))
-						]),
-					_elm_lang$core$Native_List.fromArray(
-						[finish]));
-			}
-		};
-	});
-var _concourse$atc$Pipeline$viewGraphRank = function (ncs) {
-	return A2(
-		_elm_lang$html$Html$div,
-		_elm_lang$core$Native_List.fromArray(
-			[
-				_elm_lang$html$Html_Attributes$class('rank')
-			]),
-		A2(_elm_lang$core$List$map, _concourse$atc$Pipeline$viewGraphNode, ncs));
-};
-var _concourse$atc$Pipeline$viewGraph = function (graph) {
-	return A2(
-		_elm_lang$html$Html$div,
-		_elm_lang$core$Native_List.fromArray(
-			[
-				_elm_lang$html$Html_Attributes$class('ranks')
-			]),
-		A2(
-			_elm_lang$core$List$map,
-			_concourse$atc$Pipeline$viewGraphRank,
-			_elm_community$graph$Graph$heightLevels(graph)));
+						_concourse$atc$Pipeline$viewJobNode(_p8._0)
+					]));
+		case 'InputNode':
+			return A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html_Attributes$class('node input'),
+						idAttr
+					]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_concourse$atc$Pipeline$viewInputNode(_p8._0.resourceName)
+					]));
+		case 'ConstrainedInputNode':
+			return A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html_Attributes$class('node input constrained'),
+						idAttr
+					]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_concourse$atc$Pipeline$viewConstrainedInputNode(_p8._0.resourceName)
+					]));
+		default:
+			return A2(
+				_elm_lang$html$Html$div,
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$html$Html_Attributes$class('node output'),
+						idAttr
+					]),
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_concourse$atc$Pipeline$viewOutputNode(_p8._0.resourceName)
+					]));
+	}
 };
 var _concourse$atc$Pipeline$viewGrid = function (grid) {
-	var _p8 = grid;
-	switch (_p8.ctor) {
+	var _p9 = grid;
+	switch (_p9.ctor) {
 		case 'Cell':
-			return _concourse$atc$Pipeline$viewGraphNode(_p8._0);
+			return _concourse$atc$Pipeline$viewNode(_p9._0.node);
 		case 'Serial':
 			return A2(
 				_elm_lang$html$Html$div,
@@ -19879,8 +19904,8 @@ var _concourse$atc$Pipeline$viewGrid = function (grid) {
 					]),
 				A2(
 					_elm_lang$core$Basics_ops['++'],
-					_concourse$atc$Pipeline$viewSerial(_p8._0),
-					_concourse$atc$Pipeline$viewSerial(_p8._1)));
+					_concourse$atc$Pipeline$viewSerial(_p9._0),
+					_concourse$atc$Pipeline$viewSerial(_p9._1)));
 		case 'Parallel':
 			return A2(
 				_elm_lang$html$Html$div,
@@ -19888,18 +19913,18 @@ var _concourse$atc$Pipeline$viewGrid = function (grid) {
 					[
 						_elm_lang$html$Html_Attributes$class('parallel-grid')
 					]),
-				A2(_elm_lang$core$List$map, _concourse$atc$Pipeline$viewGrid, _p8._0));
+				A2(_elm_lang$core$List$map, _concourse$atc$Pipeline$viewGrid, _p9._0));
 		default:
 			return _elm_lang$html$Html$text('');
 	}
 };
 var _concourse$atc$Pipeline$viewSerial = function (grid) {
-	var _p9 = grid;
-	if (_p9.ctor === 'Serial') {
+	var _p10 = grid;
+	if (_p10.ctor === 'Serial') {
 		return A2(
 			_elm_lang$core$Basics_ops['++'],
-			_concourse$atc$Pipeline$viewSerial(_p9._0),
-			_concourse$atc$Pipeline$viewSerial(_p9._1));
+			_concourse$atc$Pipeline$viewSerial(_p10._0),
+			_concourse$atc$Pipeline$viewSerial(_p10._1));
 	} else {
 		return _elm_lang$core$Native_List.fromArray(
 			[
@@ -19907,21 +19932,21 @@ var _concourse$atc$Pipeline$viewSerial = function (grid) {
 			]);
 	}
 };
-var _concourse$atc$Pipeline$nodeHeight = function (_p10) {
-	var _p11 = _p10;
-	var _p12 = _p11.node.label;
-	if (_p12.ctor === 'JobNode') {
+var _concourse$atc$Pipeline$nodeHeight = function (_p11) {
+	var _p12 = _p11;
+	var _p13 = _p12.label;
+	if (_p13.ctor === 'JobNode') {
 		return A2(
 			_elm_lang$core$Basics$max,
 			1,
-			_concourse$atc$Pipeline$jobResources(_p12._0));
+			_concourse$atc$Pipeline$jobResources(_p13._0));
 	} else {
 		return 1;
 	}
 };
 var _concourse$atc$Pipeline$viewMatrixCell = function (mnode) {
-	var _p13 = mnode;
-	switch (_p13.ctor) {
+	var _p14 = mnode;
+	switch (_p14.ctor) {
 		case 'MatrixSpacer':
 			return A2(
 				_elm_lang$html$Html$td,
@@ -19932,17 +19957,17 @@ var _concourse$atc$Pipeline$viewMatrixCell = function (mnode) {
 				_elm_lang$core$Native_List.fromArray(
 					[]));
 		case 'MatrixNode':
-			var _p14 = _p13._0;
+			var _p15 = _p14._0.node;
 			return A2(
 				_elm_lang$html$Html$td,
 				_elm_lang$core$Native_List.fromArray(
 					[
 						_elm_lang$html$Html_Attributes$rowspan(
-						_concourse$atc$Pipeline$nodeHeight(_p14))
+						_concourse$atc$Pipeline$nodeHeight(_p15))
 					]),
 				_elm_lang$core$Native_List.fromArray(
 					[
-						_concourse$atc$Pipeline$viewGraphNode(_p14)
+						_concourse$atc$Pipeline$viewNode(_p15)
 					]));
 		default:
 			return _elm_lang$html$Html$text('');
@@ -19956,25 +19981,22 @@ var _concourse$atc$Pipeline$viewRow = function (row) {
 		A2(_elm_lang$core$List$map, _concourse$atc$Pipeline$viewMatrixCell, row));
 };
 var _concourse$atc$Pipeline$view = function (model) {
-	var _p15 = model.error;
-	if (_p15.ctor === 'Just') {
+	var _p16 = model.error;
+	if (_p16.ctor === 'Just') {
 		return _elm_lang$html$Html$text(
-			A2(_elm_lang$core$Basics_ops['++'], 'error: ', _p15._0));
+			A2(_elm_lang$core$Basics_ops['++'], 'error: ', _p16._0));
 	} else {
 		return A2(
-			_elm_lang$html$Html$table,
+			_elm_lang$html$Html$div,
 			_elm_lang$core$Native_List.fromArray(
 				[
-					_elm_lang$html$Html_Attributes$class('pipeline-table')
+					_elm_lang$html$Html_Attributes$class('pipeline-grid')
 				]),
-			A2(
-				_elm_lang$core$List$map,
-				_concourse$atc$Pipeline$viewRow,
-				_chendrix$elm_matrix$Matrix$toList(
-					A2(
-						_concourse$atc$Grid$toMatrix,
-						_concourse$atc$Pipeline$nodeHeight,
-						_concourse$atc$Grid$fromGraph(model.graph)))));
+			_elm_lang$core$Native_List.fromArray(
+				[
+					_concourse$atc$Pipeline$viewGrid(
+					_concourse$atc$Grid$fromGraph(model.graph))
+				]));
 	}
 };
 var _concourse$atc$Pipeline$Model = F4(
@@ -19990,48 +20012,39 @@ var _concourse$atc$Pipeline$ConstrainedInputNode = function (a) {
 };
 var _concourse$atc$Pipeline$constrainedInputNode = F4(
 	function (jobs, resourceName, dependentJob, upstreamJobName) {
-		var _p16 = A2(_elm_lang$core$Dict$get, upstreamJobName, jobs);
-		if (_p16.ctor === 'Just') {
+		var _p17 = A2(_elm_lang$core$Dict$get, upstreamJobName, jobs);
+		if (_p17.ctor === 'Just') {
 			return _concourse$atc$Pipeline$ConstrainedInputNode(
-				{resourceName: resourceName, dependentJob: dependentJob, upstreamJob: _p16._0});
+				{resourceName: resourceName, dependentJob: dependentJob, upstreamJob: _p17._0});
 		} else {
 			return _elm_lang$core$Native_Utils.crashCase(
 				'Pipeline',
 				{
-					start: {line: 269, column: 3},
-					end: {line: 278, column: 70}
+					start: {line: 262, column: 3},
+					end: {line: 271, column: 70}
 				},
-				_p16)('impossible: job name not found; invalid pipeline?');
+				_p17)('impossible: job name not found; invalid pipeline?');
 		}
 	});
 var _concourse$atc$Pipeline$OutputNode = function (a) {
 	return {ctor: 'OutputNode', _0: a};
 };
-var _concourse$atc$Pipeline$outputNodes = F2(
-	function (job, _p18) {
-		var _p19 = _p18;
-		return _elm_lang$core$Native_List.fromArray(
-			[
-				_concourse$atc$Pipeline$OutputNode(
-				{resourceName: _p19.resource, upstreamJob: job})
-			]);
-	});
 var _concourse$atc$Pipeline$InputNode = function (a) {
 	return {ctor: 'InputNode', _0: a};
 };
 var _concourse$atc$Pipeline$inputNodes = F3(
-	function (jobs, job, _p20) {
-		var _p21 = _p20;
-		var _p23 = _p21.resource;
-		var _p22 = _p21.passed;
-		return _elm_lang$core$List$isEmpty(_p22) ? _elm_lang$core$Native_List.fromArray(
+	function (jobs, job, _p19) {
+		var _p20 = _p19;
+		var _p22 = _p20.resource;
+		var _p21 = _p20.passed;
+		return _elm_lang$core$List$isEmpty(_p21) ? _elm_lang$core$Native_List.fromArray(
 			[
 				_concourse$atc$Pipeline$InputNode(
-				{resourceName: _p23, dependentJob: job})
+				{resourceName: _p22, dependentJob: job})
 			]) : A2(
 			_elm_lang$core$List$map,
-			A3(_concourse$atc$Pipeline$constrainedInputNode, jobs, _p23, job),
-			_p22);
+			A3(_concourse$atc$Pipeline$constrainedInputNode, jobs, _p22, job),
+			_p21);
 	});
 var _concourse$atc$Pipeline$jobResourceNodes = F2(
 	function (jobs, job) {
@@ -20051,9 +20064,9 @@ var _concourse$atc$Pipeline$JobNode = function (a) {
 };
 var _concourse$atc$Pipeline$jobId = F2(
 	function (nodes, job) {
-		var _p25 = A2(
+		var _p24 = A2(
 			_elm_lang$core$List$filter,
-			function (_p24) {
+			function (_p23) {
 				return A2(
 					F2(
 						function (x, y) {
@@ -20062,27 +20075,27 @@ var _concourse$atc$Pipeline$jobId = F2(
 					_concourse$atc$Pipeline$JobNode(job),
 					function (_) {
 						return _.label;
-					}(_p24));
+					}(_p23));
 			},
 			nodes);
-		if (_p25.ctor === '::') {
-			return _p25._0.id;
+		if (_p24.ctor === '::') {
+			return _p24._0.id;
 		} else {
 			return _elm_lang$core$Native_Utils.crashCase(
 				'Pipeline',
 				{
-					start: {line: 299, column: 3},
-					end: {line: 304, column: 52}
+					start: {line: 292, column: 3},
+					end: {line: 297, column: 52}
 				},
-				_p25)('impossible: job index not found');
+				_p24)('impossible: job index not found');
 		}
 	});
 var _concourse$atc$Pipeline$nodeEdges = F2(
-	function (allNodes, _p27) {
-		var _p28 = _p27;
-		var _p30 = _p28.id;
-		var _p29 = _p28.label;
-		switch (_p29.ctor) {
+	function (allNodes, _p26) {
+		var _p27 = _p26;
+		var _p29 = _p27.id;
+		var _p28 = _p27.label;
+		switch (_p28.ctor) {
 			case 'JobNode':
 				return _elm_lang$core$Native_List.fromArray(
 					[]);
@@ -20091,8 +20104,8 @@ var _concourse$atc$Pipeline$nodeEdges = F2(
 					[
 						A3(
 						_elm_community$graph$Graph$Edge,
-						_p30,
-						A2(_concourse$atc$Pipeline$jobId, allNodes, _p29._0.dependentJob),
+						_p29,
+						A2(_concourse$atc$Pipeline$jobId, allNodes, _p28._0.dependentJob),
 						{ctor: '_Tuple0'})
 					]);
 			case 'ConstrainedInputNode':
@@ -20100,13 +20113,13 @@ var _concourse$atc$Pipeline$nodeEdges = F2(
 					[
 						A3(
 						_elm_community$graph$Graph$Edge,
-						A2(_concourse$atc$Pipeline$jobId, allNodes, _p29._0.upstreamJob),
-						_p30,
+						A2(_concourse$atc$Pipeline$jobId, allNodes, _p28._0.upstreamJob),
+						_p29,
 						{ctor: '_Tuple0'}),
 						A3(
 						_elm_community$graph$Graph$Edge,
-						_p30,
-						A2(_concourse$atc$Pipeline$jobId, allNodes, _p29._0.dependentJob),
+						_p29,
+						A2(_concourse$atc$Pipeline$jobId, allNodes, _p28._0.dependentJob),
 						{ctor: '_Tuple0'})
 					]);
 			default:
@@ -20114,8 +20127,8 @@ var _concourse$atc$Pipeline$nodeEdges = F2(
 					[
 						A3(
 						_elm_community$graph$Graph$Edge,
-						A2(_concourse$atc$Pipeline$jobId, allNodes, _p29._0.upstreamJob),
-						_p30,
+						A2(_concourse$atc$Pipeline$jobId, allNodes, _p28._0.upstreamJob),
+						_p29,
 						{ctor: '_Tuple0'})
 					]);
 		}
@@ -20150,19 +20163,19 @@ var _concourse$atc$Pipeline$initGraph = function (jobs) {
 };
 var _concourse$atc$Pipeline$update = F2(
 	function (msg, model) {
-		var _p31 = msg;
-		if (_p31.ctor === 'Noop') {
+		var _p30 = msg;
+		if (_p30.ctor === 'Noop') {
 			return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
 		} else {
-			if (_p31._0.ctor === 'Ok') {
-				var _p32 = _p31._0._0;
+			if (_p30._0.ctor === 'Ok') {
+				var _p31 = _p30._0._0;
 				return {
 					ctor: '_Tuple2',
 					_0: _elm_lang$core$Native_Utils.update(
 						model,
 						{
-							jobs: _p32,
-							graph: _concourse$atc$Pipeline$initGraph(_p32)
+							jobs: _p31,
+							graph: _concourse$atc$Pipeline$initGraph(_p31)
 						}),
 					_1: _elm_lang$core$Platform_Cmd$none
 				};
@@ -20173,7 +20186,7 @@ var _concourse$atc$Pipeline$update = F2(
 						model,
 						{
 							error: _elm_lang$core$Maybe$Just(
-								_elm_lang$core$Basics$toString(_p31._0._0))
+								_elm_lang$core$Basics$toString(_p30._0._0))
 						}),
 					_1: _elm_lang$core$Platform_Cmd$none
 				};
