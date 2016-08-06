@@ -11,6 +11,7 @@ import Html.Events exposing (onClick, on, onWithOptions)
 import Html.Lazy
 import Http
 import Json.Decode exposing ((:=))
+import Navigation
 import Process
 import Task exposing (Task)
 import Time exposing (Time)
@@ -188,6 +189,9 @@ handleBuildFetched build model =
         _ ->
           Cmd.none
 
+    updateBuildURL =
+      Navigation.newUrl <| Concourse.Build.url build
+
     (newModel, cmd) =
       if build.status == Concourse.BuildStatus.Pending then
         (withBuild, pollUntilStarted build.id)
@@ -204,7 +208,7 @@ handleBuildFetched build model =
               )
       else (withBuild, Cmd.none)
   in
-    (newModel, Cmd.batch [cmd, fetchJobAndHistory])
+    (newModel, Cmd.batch [cmd, updateBuildURL, fetchJobAndHistory])
 
 pollUntilStarted : Int -> Cmd Action
 pollUntilStarted buildId =
@@ -264,9 +268,9 @@ view : Model -> Html Action
 view model =
   case model.currentBuild of
     Just currentBuild ->
-      Html.div []
+      Html.div [class "with-fixed-header"]
         [ viewBuildHeader (currentBuildBuild currentBuild) model
-        , Html.div (id "build-body" :: paddingClass (currentBuildBuild currentBuild)) <|
+        , Html.div [class "scrollable-body"] <|
           [ viewBuildPrep currentBuild.prep
           , Html.Lazy.lazy viewBuildOutput <| currentBuildOutput currentBuild
           ] ++
@@ -329,15 +333,6 @@ view model =
 mmDDYY : Date -> String
 mmDDYY d =
   Date.Format.format "%m/%d/" d ++ String.right 2 (Date.Format.format "%Y" d)
-
-paddingClass : Build -> List (Html.Attribute Action)
-paddingClass build =
-  case build.job of
-    Just _ ->
-      []
-
-    _ ->
-      [class "build-body-noSubHeader"]
 
 viewBuildOutput : Maybe BuildOutput.Model -> Html Action
 viewBuildOutput output =
@@ -449,8 +444,8 @@ viewBuildHeader build {now, job, history} =
       _ ->
         Html.text ("build #" ++ toString build.id)
   in
-    Html.div [id "page-header", class (Concourse.BuildStatus.show build.status)]
-      [ Html.div [class "build-header"]
+    Html.div [class "fixed-header"]
+      [ Html.div [class ("build-header " ++ Concourse.BuildStatus.show build.status)]
           [ Html.div [class "build-actions fr"] [triggerButton, abortButton]
           , Html.h1 [] [buildTitle]
           , BuildDuration.view build.duration now
@@ -491,8 +486,15 @@ viewHistoryItem currentBuild build =
 overrideClick : Action -> Html.Attribute Action
 overrideClick action =
   Html.Events.onWithOptions "click"
-    { stopPropagation = True, preventDefault = True }
-    (Json.Decode.succeed action)
+    { stopPropagation = True, preventDefault = True } <|
+      Json.Decode.customDecoder
+      ("button" := Json.Decode.int) <|
+        assertLeftButton action
+
+assertLeftButton : Action -> Int -> Result String Action
+assertLeftButton action button =
+  if button == 0 then Ok action
+  else Err "placeholder error, nothing is wrong"
 
 durationTitle : Date -> List (Html Action) -> Html Action
 durationTitle date content =

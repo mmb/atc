@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/garden"
+	"code.cloudfoundry.org/lager"
 	"github.com/concourse/atc"
 	"github.com/concourse/atc/auth"
 	"github.com/gorilla/websocket"
-	"code.cloudfoundry.org/lager"
 )
 
 var upgrader = websocket.Upgrader{
@@ -18,7 +18,7 @@ var upgrader = websocket.Upgrader{
 }
 
 func (s *Server) HijackContainer(w http.ResponseWriter, r *http.Request) {
-	teamName := auth.GetAuthOrDefaultTeamName(r)
+	teamName := auth.GetAuthTeamName(r)
 	handle := r.FormValue(":id")
 
 	hLog := s.logger.Session("hijack", lager.Data{

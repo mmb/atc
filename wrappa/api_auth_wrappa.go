@@ -7,16 +7,19 @@ import (
 )
 
 type APIAuthWrappa struct {
-	Validator         auth.Validator
+	AuthValidator     auth.Validator
+	TokenValidator    auth.Validator
 	UserContextReader auth.UserContextReader
 }
 
 func NewAPIAuthWrappa(
-	validator auth.Validator,
+	authValidator auth.Validator,
+	tokenValidator auth.Validator,
 	userContextReader auth.UserContextReader,
 ) *APIAuthWrappa {
 	return &APIAuthWrappa{
-		Validator:         validator,
+		AuthValidator:     authValidator,
+		TokenValidator:    tokenValidator,
 		UserContextReader: userContextReader,
 	}
 }
@@ -32,15 +35,15 @@ func (wrappa *APIAuthWrappa) Wrap(handlers rata.Handlers) rata.Handlers {
 		switch name {
 		// unauthenticated / delegating to handler
 		case atc.DownloadCLI,
-			atc.ListAuthMethods,
+			atc.ListAuthMethods, //teamname -
 			atc.GetInfo,
 			atc.BuildEvents,
-			atc.GetBuild,
+			atc.GetBuild, //teamname -
 			atc.BuildResources,
 			atc.GetBuildPlan,
 			atc.GetBuildPreparation,
-			atc.ListAllPipelines,
-			atc.ListBuilds,
+			atc.ListAllPipelines, //teamname -
+			atc.ListBuilds,       //teamname -
 			atc.GetJobBuild,
 			atc.JobBadge,
 			atc.ListJobs,
@@ -56,19 +59,19 @@ func (wrappa *APIAuthWrappa) Wrap(handlers rata.Handlers) rata.Handlers {
 
 		// authenticated
 		case atc.GetAuthToken,
-			atc.AbortBuild,
-			atc.CreateBuild,
+			atc.AbortBuild,  //teamname -
+			atc.CreateBuild, //teamname -
 			atc.CreatePipe,
-			atc.GetContainer,
-			atc.HijackContainer,
-			atc.ListContainers,
-			atc.ListWorkers,
+			atc.GetContainer,    //teamname -
+			atc.HijackContainer, //teamname -
+			atc.ListContainers,  //teamname -
+			atc.ListWorkers,     //teamname -
 			atc.ReadPipe,
 			atc.RegisterWorker,
 			atc.SetLogLevel,
 			atc.SetTeam,
 			atc.WritePipe,
-			atc.ListVolumes,
+			atc.ListVolumes, //teamname - what does that mean?
 			atc.GetLogLevel:
 			newHandler = auth.CheckAuthenticationHandler(handler, rejector)
 
@@ -99,8 +102,11 @@ func (wrappa *APIAuthWrappa) Wrap(handlers rata.Handlers) rata.Handlers {
 			panic("you missed a spot")
 		}
 
-		newHandler = auth.WrapHandler(newHandler, wrappa.Validator, wrappa.UserContextReader)
-
+		if name == atc.GetAuthToken {
+			newHandler = auth.WrapHandler(newHandler, wrappa.AuthValidator, wrappa.UserContextReader)
+		} else {
+			newHandler = auth.WrapHandler(newHandler, wrappa.TokenValidator, wrappa.UserContextReader)
+		}
 		wrapped[name] = newHandler
 	}
 

@@ -6,15 +6,15 @@ import (
 	"net/http"
 	"strconv"
 
+	"code.cloudfoundry.org/lager"
 	"github.com/concourse/atc"
 	"github.com/concourse/atc/api/present"
 	"github.com/concourse/atc/auth"
 	"github.com/concourse/atc/db"
-	"code.cloudfoundry.org/lager"
 )
 
 func (s *Server) ListContainers(w http.ResponseWriter, r *http.Request) {
-	teamName := auth.GetAuthOrDefaultTeamName(r)
+	teamName := auth.GetAuthTeamName(r)
 	params := r.URL.RawQuery
 
 	hLog := s.logger.Session("list-containers", lager.Data{

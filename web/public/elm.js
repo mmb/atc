@@ -8078,7 +8078,7 @@ var _concourse$atc$Scroll$onSelfMsg = F3(
 	});
 var _concourse$atc$Scroll$init = _elm_lang$core$Task$succeed(_elm_lang$core$Maybe$Nothing);
 var _concourse$atc$Scroll$scrollIntoView = _concourse$atc$Native_Scroll.scrollIntoView;
-var _concourse$atc$Scroll$scroll = _concourse$atc$Native_Scroll.scroll;
+var _concourse$atc$Scroll$scroll = _concourse$atc$Native_Scroll.scrollElement;
 var _concourse$atc$Scroll$toBottom = _concourse$atc$Native_Scroll.toBottom(
 	{ctor: '_Tuple0'});
 var _concourse$atc$Scroll$decodeComparators = A4(
@@ -9462,6 +9462,353 @@ var _evancz$elm_http$Http$post = F3(
 			decoder,
 			A2(_evancz$elm_http$Http$send, _evancz$elm_http$Http$defaultSettings, request));
 	});
+
+var _elm_lang$navigation$Native_Navigation = function() {
+
+function go(n)
+{
+	return _elm_lang$core$Native_Scheduler.nativeBinding(function(callback)
+	{
+		if (n !== 0)
+		{
+			history.go(n);
+		}
+		callback(_elm_lang$core$Native_Scheduler.succeed(_elm_lang$core$Native_Utils.Tuple0));
+	});
+}
+
+function pushState(url)
+{
+	return _elm_lang$core$Native_Scheduler.nativeBinding(function(callback)
+	{
+		history.pushState({}, '', url);
+		callback(_elm_lang$core$Native_Scheduler.succeed(getLocation()));
+	});
+}
+
+function replaceState(url)
+{
+	return _elm_lang$core$Native_Scheduler.nativeBinding(function(callback)
+	{
+		history.replaceState({}, '', url);
+		callback(_elm_lang$core$Native_Scheduler.succeed(getLocation()));
+	});
+}
+
+function getLocation()
+{
+	var location = document.location;
+
+	return {
+		href: location.href,
+		host: location.host,
+		hostname: location.hostname,
+		protocol: location.protocol,
+		origin: location.origin,
+		port_: location.port,
+		pathname: location.pathname,
+		search: location.search,
+		hash: location.hash,
+		username: location.username,
+		password: location.password
+	};
+}
+
+
+return {
+	go: go,
+	pushState: pushState,
+	replaceState: replaceState,
+	getLocation: getLocation
+};
+
+}();
+
+var _elm_lang$navigation$Navigation$replaceState = _elm_lang$navigation$Native_Navigation.replaceState;
+var _elm_lang$navigation$Navigation$pushState = _elm_lang$navigation$Native_Navigation.pushState;
+var _elm_lang$navigation$Navigation$go = _elm_lang$navigation$Native_Navigation.go;
+var _elm_lang$navigation$Navigation$spawnPopState = function (router) {
+	return _elm_lang$core$Process$spawn(
+		A3(
+			_elm_lang$dom$Dom_LowLevel$onWindow,
+			'popstate',
+			_elm_lang$core$Json_Decode$value,
+			function (_p0) {
+				return A2(
+					_elm_lang$core$Platform$sendToSelf,
+					router,
+					_elm_lang$navigation$Native_Navigation.getLocation(
+						{ctor: '_Tuple0'}));
+			}));
+};
+var _elm_lang$navigation$Navigation_ops = _elm_lang$navigation$Navigation_ops || {};
+_elm_lang$navigation$Navigation_ops['&>'] = F2(
+	function (task1, task2) {
+		return A2(
+			_elm_lang$core$Task$andThen,
+			task1,
+			function (_p1) {
+				return task2;
+			});
+	});
+var _elm_lang$navigation$Navigation$notify = F3(
+	function (router, subs, location) {
+		var send = function (_p2) {
+			var _p3 = _p2;
+			return A2(
+				_elm_lang$core$Platform$sendToApp,
+				router,
+				_p3._0(location));
+		};
+		return A2(
+			_elm_lang$navigation$Navigation_ops['&>'],
+			_elm_lang$core$Task$sequence(
+				A2(_elm_lang$core$List$map, send, subs)),
+			_elm_lang$core$Task$succeed(
+				{ctor: '_Tuple0'}));
+	});
+var _elm_lang$navigation$Navigation$onSelfMsg = F3(
+	function (router, location, state) {
+		return A2(
+			_elm_lang$navigation$Navigation_ops['&>'],
+			A3(_elm_lang$navigation$Navigation$notify, router, state.subs, location),
+			_elm_lang$core$Task$succeed(state));
+	});
+var _elm_lang$navigation$Navigation$cmdHelp = F3(
+	function (router, subs, cmd) {
+		var _p4 = cmd;
+		switch (_p4.ctor) {
+			case 'Jump':
+				return _elm_lang$navigation$Navigation$go(_p4._0);
+			case 'New':
+				return A2(
+					_elm_lang$core$Task$andThen,
+					_elm_lang$navigation$Navigation$pushState(_p4._0),
+					A2(_elm_lang$navigation$Navigation$notify, router, subs));
+			default:
+				return A2(
+					_elm_lang$core$Task$andThen,
+					_elm_lang$navigation$Navigation$replaceState(_p4._0),
+					A2(_elm_lang$navigation$Navigation$notify, router, subs));
+		}
+	});
+var _elm_lang$navigation$Navigation$updateHelp = F2(
+	function (func, _p5) {
+		var _p6 = _p5;
+		return {
+			ctor: '_Tuple2',
+			_0: _p6._0,
+			_1: A2(_elm_lang$core$Platform_Cmd$map, func, _p6._1)
+		};
+	});
+var _elm_lang$navigation$Navigation$subscription = _elm_lang$core$Native_Platform.leaf('Navigation');
+var _elm_lang$navigation$Navigation$command = _elm_lang$core$Native_Platform.leaf('Navigation');
+var _elm_lang$navigation$Navigation$Location = function (a) {
+	return function (b) {
+		return function (c) {
+			return function (d) {
+				return function (e) {
+					return function (f) {
+						return function (g) {
+							return function (h) {
+								return function (i) {
+									return function (j) {
+										return function (k) {
+											return {href: a, host: b, hostname: c, protocol: d, origin: e, port_: f, pathname: g, search: h, hash: i, username: j, password: k};
+										};
+									};
+								};
+							};
+						};
+					};
+				};
+			};
+		};
+	};
+};
+var _elm_lang$navigation$Navigation$State = F2(
+	function (a, b) {
+		return {subs: a, process: b};
+	});
+var _elm_lang$navigation$Navigation$init = _elm_lang$core$Task$succeed(
+	A2(
+		_elm_lang$navigation$Navigation$State,
+		_elm_lang$core$Native_List.fromArray(
+			[]),
+		_elm_lang$core$Maybe$Nothing));
+var _elm_lang$navigation$Navigation$onEffects = F4(
+	function (router, cmds, subs, _p7) {
+		var _p8 = _p7;
+		var _p10 = _p8.process;
+		var stepState = function () {
+			var _p9 = {ctor: '_Tuple2', _0: subs, _1: _p10};
+			_v4_2:
+			do {
+				if (_p9._0.ctor === '[]') {
+					if (_p9._1.ctor === 'Just') {
+						return A2(
+							_elm_lang$navigation$Navigation_ops['&>'],
+							_elm_lang$core$Process$kill(_p9._1._0),
+							_elm_lang$core$Task$succeed(
+								A2(_elm_lang$navigation$Navigation$State, subs, _elm_lang$core$Maybe$Nothing)));
+					} else {
+						break _v4_2;
+					}
+				} else {
+					if (_p9._1.ctor === 'Nothing') {
+						return A2(
+							_elm_lang$core$Task$andThen,
+							_elm_lang$navigation$Navigation$spawnPopState(router),
+							function (pid) {
+								return _elm_lang$core$Task$succeed(
+									A2(
+										_elm_lang$navigation$Navigation$State,
+										subs,
+										_elm_lang$core$Maybe$Just(pid)));
+							});
+					} else {
+						break _v4_2;
+					}
+				}
+			} while(false);
+			return _elm_lang$core$Task$succeed(
+				A2(_elm_lang$navigation$Navigation$State, subs, _p10));
+		}();
+		return A2(
+			_elm_lang$navigation$Navigation_ops['&>'],
+			_elm_lang$core$Task$sequence(
+				A2(
+					_elm_lang$core$List$map,
+					A2(_elm_lang$navigation$Navigation$cmdHelp, router, subs),
+					cmds)),
+			stepState);
+	});
+var _elm_lang$navigation$Navigation$UserMsg = function (a) {
+	return {ctor: 'UserMsg', _0: a};
+};
+var _elm_lang$navigation$Navigation$Change = function (a) {
+	return {ctor: 'Change', _0: a};
+};
+var _elm_lang$navigation$Navigation$Parser = function (a) {
+	return {ctor: 'Parser', _0: a};
+};
+var _elm_lang$navigation$Navigation$makeParser = _elm_lang$navigation$Navigation$Parser;
+var _elm_lang$navigation$Navigation$Modify = function (a) {
+	return {ctor: 'Modify', _0: a};
+};
+var _elm_lang$navigation$Navigation$modifyUrl = function (url) {
+	return _elm_lang$navigation$Navigation$command(
+		_elm_lang$navigation$Navigation$Modify(url));
+};
+var _elm_lang$navigation$Navigation$New = function (a) {
+	return {ctor: 'New', _0: a};
+};
+var _elm_lang$navigation$Navigation$newUrl = function (url) {
+	return _elm_lang$navigation$Navigation$command(
+		_elm_lang$navigation$Navigation$New(url));
+};
+var _elm_lang$navigation$Navigation$Jump = function (a) {
+	return {ctor: 'Jump', _0: a};
+};
+var _elm_lang$navigation$Navigation$back = function (n) {
+	return _elm_lang$navigation$Navigation$command(
+		_elm_lang$navigation$Navigation$Jump(0 - n));
+};
+var _elm_lang$navigation$Navigation$forward = function (n) {
+	return _elm_lang$navigation$Navigation$command(
+		_elm_lang$navigation$Navigation$Jump(n));
+};
+var _elm_lang$navigation$Navigation$cmdMap = F2(
+	function (_p11, myCmd) {
+		var _p12 = myCmd;
+		switch (_p12.ctor) {
+			case 'Jump':
+				return _elm_lang$navigation$Navigation$Jump(_p12._0);
+			case 'New':
+				return _elm_lang$navigation$Navigation$New(_p12._0);
+			default:
+				return _elm_lang$navigation$Navigation$Modify(_p12._0);
+		}
+	});
+var _elm_lang$navigation$Navigation$Monitor = function (a) {
+	return {ctor: 'Monitor', _0: a};
+};
+var _elm_lang$navigation$Navigation$programWithFlags = F2(
+	function (_p13, stuff) {
+		var _p14 = _p13;
+		var _p16 = _p14._0;
+		var location = _elm_lang$navigation$Native_Navigation.getLocation(
+			{ctor: '_Tuple0'});
+		var init = function (flags) {
+			return A2(
+				_elm_lang$navigation$Navigation$updateHelp,
+				_elm_lang$navigation$Navigation$UserMsg,
+				A2(
+					stuff.init,
+					flags,
+					_p16(location)));
+		};
+		var view = function (model) {
+			return A2(
+				_elm_lang$html$Html_App$map,
+				_elm_lang$navigation$Navigation$UserMsg,
+				stuff.view(model));
+		};
+		var subs = function (model) {
+			return _elm_lang$core$Platform_Sub$batch(
+				_elm_lang$core$Native_List.fromArray(
+					[
+						_elm_lang$navigation$Navigation$subscription(
+						_elm_lang$navigation$Navigation$Monitor(_elm_lang$navigation$Navigation$Change)),
+						A2(
+						_elm_lang$core$Platform_Sub$map,
+						_elm_lang$navigation$Navigation$UserMsg,
+						stuff.subscriptions(model))
+					]));
+		};
+		var update = F2(
+			function (msg, model) {
+				return A2(
+					_elm_lang$navigation$Navigation$updateHelp,
+					_elm_lang$navigation$Navigation$UserMsg,
+					function () {
+						var _p15 = msg;
+						if (_p15.ctor === 'Change') {
+							return A2(
+								stuff.urlUpdate,
+								_p16(_p15._0),
+								model);
+						} else {
+							return A2(stuff.update, _p15._0, model);
+						}
+					}());
+			});
+		return _elm_lang$html$Html_App$programWithFlags(
+			{init: init, view: view, update: update, subscriptions: subs});
+	});
+var _elm_lang$navigation$Navigation$program = F2(
+	function (parser, stuff) {
+		return A2(
+			_elm_lang$navigation$Navigation$programWithFlags,
+			parser,
+			_elm_lang$core$Native_Utils.update(
+				stuff,
+				{
+					init: function (_p17) {
+						return stuff.init;
+					}
+				}));
+	});
+var _elm_lang$navigation$Navigation$subMap = F2(
+	function (func, _p18) {
+		var _p19 = _p18;
+		return _elm_lang$navigation$Navigation$Monitor(
+			function (_p20) {
+				return func(
+					_p19._0(_p20));
+			});
+	});
+_elm_lang$core$Native_Platform.effectManagers['Navigation'] = {pkg: 'elm-lang/navigation', init: _elm_lang$navigation$Navigation$init, onEffects: _elm_lang$navigation$Navigation$onEffects, onSelfMsg: _elm_lang$navigation$Navigation$onSelfMsg, tag: 'fx', cmdMap: _elm_lang$navigation$Navigation$cmdMap, subMap: _elm_lang$navigation$Navigation$subMap};
 
 var _vito$elm_ansi$Ansi$encodeCode = function (code) {
 	var _p0 = code;
@@ -14735,12 +15082,19 @@ var _concourse$atc$Build$durationTitle = F2(
 				]),
 			content);
 	});
+var _concourse$atc$Build$assertLeftButton = F2(
+	function (action, button) {
+		return _elm_lang$core$Native_Utils.eq(button, 0) ? _elm_lang$core$Result$Ok(action) : _elm_lang$core$Result$Err('placeholder error, nothing is wrong');
+	});
 var _concourse$atc$Build$overrideClick = function (action) {
 	return A3(
 		_elm_lang$html$Html_Events$onWithOptions,
 		'click',
 		{stopPropagation: true, preventDefault: true},
-		_elm_lang$core$Json_Decode$succeed(action));
+		A2(
+			_elm_lang$core$Json_Decode$customDecoder,
+			A2(_elm_lang$core$Json_Decode_ops[':='], 'button', _elm_lang$core$Json_Decode$int),
+			_concourse$atc$Build$assertLeftButton(action)));
 };
 var _concourse$atc$Build$viewBuildPrepStatus = function (status) {
 	var _p0 = status;
@@ -14933,18 +15287,6 @@ var _concourse$atc$Build$viewBuildPrep = function (prep) {
 				[]));
 	}
 };
-var _concourse$atc$Build$paddingClass = function (build) {
-	var _p7 = build.job;
-	if (_p7.ctor === 'Just') {
-		return _elm_lang$core$Native_List.fromArray(
-			[]);
-	} else {
-		return _elm_lang$core$Native_List.fromArray(
-			[
-				_elm_lang$html$Html_Attributes$class('build-body-noSubHeader')
-			]);
-	}
-};
 var _concourse$atc$Build$mmDDYY = function (d) {
 	return A2(
 		_elm_lang$core$Basics_ops['++'],
@@ -14985,35 +15327,35 @@ var _concourse$atc$Build$handleBuildJobFetched = F2(
 		return {ctor: '_Tuple2', _0: withJobDetails, _1: _elm_lang$core$Platform_Cmd$none};
 	});
 var _concourse$atc$Build$currentBuildOutput = function (cb) {
-	var _p8 = cb.buildOrOutput;
-	if (_p8.ctor === 'NoOutput') {
+	var _p7 = cb.buildOrOutput;
+	if (_p7.ctor === 'NoOutput') {
 		return _elm_lang$core$Maybe$Nothing;
 	} else {
-		return _elm_lang$core$Maybe$Just(_p8._0);
+		return _elm_lang$core$Maybe$Just(_p7._0);
 	}
 };
 var _concourse$atc$Build$currentBuildBuild = function (cb) {
-	var _p9 = cb.buildOrOutput;
-	if (_p9.ctor === 'NoOutput') {
-		return _p9._0;
+	var _p8 = cb.buildOrOutput;
+	if (_p8.ctor === 'NoOutput') {
+		return _p8._0;
 	} else {
-		return _p9._0.build;
+		return _p8._0.build;
 	}
 };
 var _concourse$atc$Build$getScrollBehavior = function (model) {
-	var _p11 = A2(
+	var _p10 = A2(
 		_elm_lang$core$Maybe$withDefault,
 		_concourse$atc$Concourse_BuildStatus$Pending,
 		A2(
 			_elm_lang$core$Maybe$map,
-			function (_p10) {
+			function (_p9) {
 				return function (_) {
 					return _.status;
 				}(
-					_concourse$atc$Build$currentBuildBuild(_p10));
+					_concourse$atc$Build$currentBuildBuild(_p9));
 			},
 			model.currentBuild));
-	switch (_p11.ctor) {
+	switch (_p10.ctor) {
 		case 'Failed':
 			return _concourse$atc$Autoscroll$ScrollUntilCancelled;
 		case 'Errored':
@@ -15054,11 +15396,11 @@ var _concourse$atc$Build$BuildAborted = function (a) {
 	return {ctor: 'BuildAborted', _0: a};
 };
 var _concourse$atc$Build$abortBuild = function (buildId) {
-	return function (_p12) {
+	return function (_p11) {
 		return A2(
 			_elm_lang$core$Platform_Cmd$map,
 			_concourse$atc$Build$BuildAborted,
-			A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p12));
+			A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p11));
 	}(
 		_concourse$atc$Concourse_Build$abort(buildId));
 };
@@ -15073,9 +15415,9 @@ var _concourse$atc$Build$BuildOutputAction = function (a) {
 };
 var _concourse$atc$Build$initBuildOutput = F2(
 	function (build, model) {
-		var _p13 = _concourse$atc$BuildOutput$init(build);
-		var output = _p13._0;
-		var outputCmd = _p13._1;
+		var _p12 = _concourse$atc$BuildOutput$init(build);
+		var output = _p12._0;
+		var outputCmd = _p12._1;
 		return {
 			ctor: '_Tuple2',
 			_0: _elm_lang$core$Native_Utils.update(
@@ -15096,12 +15438,12 @@ var _concourse$atc$Build$initBuildOutput = F2(
 		};
 	});
 var _concourse$atc$Build$viewBuildOutput = function (output) {
-	var _p14 = output;
-	if (_p14.ctor === 'Just') {
+	var _p13 = output;
+	if (_p13.ctor === 'Just') {
 		return A2(
 			_elm_lang$html$Html_App$map,
 			_concourse$atc$Build$BuildOutputAction,
-			_concourse$atc$BuildOutput$view(_p14._0));
+			_concourse$atc$BuildOutput$view(_p13._0));
 	} else {
 		return A2(
 			_elm_lang$html$Html$div,
@@ -15115,11 +15457,11 @@ var _concourse$atc$Build$BuildJobDetailsFetched = function (a) {
 	return {ctor: 'BuildJobDetailsFetched', _0: a};
 };
 var _concourse$atc$Build$fetchBuildJobDetails = function (buildJob) {
-	return function (_p15) {
+	return function (_p14) {
 		return A2(
 			_elm_lang$core$Platform_Cmd$map,
 			_concourse$atc$Build$BuildJobDetailsFetched,
-			A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p15));
+			A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p14));
 	}(
 		_concourse$atc$Concourse_Job$fetchJob(buildJob));
 };
@@ -15128,11 +15470,11 @@ var _concourse$atc$Build$BuildHistoryFetched = function (a) {
 };
 var _concourse$atc$Build$fetchBuildHistory = F2(
 	function (job, page) {
-		return function (_p16) {
+		return function (_p15) {
 			return A2(
 				_elm_lang$core$Platform_Cmd$map,
 				_concourse$atc$Build$BuildHistoryFetched,
-				A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p16));
+				A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p15));
 		}(
 			A2(_concourse$atc$Concourse_Build$fetchJobBuilds, job, page));
 	});
@@ -15143,23 +15485,23 @@ var _concourse$atc$Build$handleHistoryFetched = F2(
 			{
 				history: A2(_elm_lang$core$List$append, model.history, history.content)
 			});
-		var _p18 = {
+		var _p17 = {
 			ctor: '_Tuple2',
 			_0: history.pagination.nextPage,
 			_1: A2(
 				_elm_lang$core$Maybe$andThen,
 				model.currentBuild,
-				function (_p17) {
+				function (_p16) {
 					return function (_) {
 						return _.job;
 					}(
-						_concourse$atc$Build$currentBuildBuild(_p17));
+						_concourse$atc$Build$currentBuildBuild(_p16));
 				})
 		};
-		if (_p18._0.ctor === 'Nothing') {
+		if (_p17._0.ctor === 'Nothing') {
 			return {ctor: '_Tuple2', _0: withBuilds, _1: _elm_lang$core$Platform_Cmd$none};
 		} else {
-			if (_p18._1.ctor === 'Just') {
+			if (_p17._1.ctor === 'Just') {
 				return {
 					ctor: '_Tuple2',
 					_0: withBuilds,
@@ -15168,18 +15510,18 @@ var _concourse$atc$Build$handleHistoryFetched = F2(
 							[
 								A2(
 								_concourse$atc$Build$fetchBuildHistory,
-								_p18._1._0,
-								_elm_lang$core$Maybe$Just(_p18._0._0))
+								_p17._1._0,
+								_elm_lang$core$Maybe$Just(_p17._0._0))
 							]))
 				};
 			} else {
 				return _elm_lang$core$Native_Utils.crashCase(
 					'Build',
 					{
-						start: {line: 244, column: 5},
-						end: {line: 252, column: 33}
+						start: {line: 248, column: 5},
+						end: {line: 256, column: 33}
 					},
-					_p18)('impossible');
+					_p17)('impossible');
 			}
 		}
 	});
@@ -15188,11 +15530,11 @@ var _concourse$atc$Build$BuildPrepFetched = function (a) {
 };
 var _concourse$atc$Build$fetchBuildPrep = F2(
 	function (delay, buildId) {
-		return function (_p20) {
+		return function (_p19) {
 			return A2(
 				_elm_lang$core$Platform_Cmd$map,
 				_concourse$atc$Build$BuildPrepFetched,
-				A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p20));
+				A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p19));
 		}(
 			A2(
 				_elm_lang$core$Task$andThen,
@@ -15205,11 +15547,11 @@ var _concourse$atc$Build$BuildFetched = function (a) {
 };
 var _concourse$atc$Build$fetchBuild = F2(
 	function (delay, buildId) {
-		return function (_p21) {
+		return function (_p20) {
 			return A2(
 				_elm_lang$core$Platform_Cmd$map,
 				_concourse$atc$Build$BuildFetched,
-				A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p21));
+				A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p20));
 		}(
 			A2(
 				_elm_lang$core$Task$andThen,
@@ -15227,30 +15569,32 @@ var _concourse$atc$Build$pollUntilStarted = function (buildId) {
 };
 var _concourse$atc$Build$handleBuildFetched = F2(
 	function (build, model) {
+		var updateBuildURL = _elm_lang$navigation$Navigation$newUrl(
+			_concourse$atc$Concourse_Build$url(build));
 		var fetchJobAndHistory = function () {
-			var _p22 = {ctor: '_Tuple2', _0: model.job, _1: build.job};
-			if (((_p22.ctor === '_Tuple2') && (_p22._0.ctor === 'Nothing')) && (_p22._1.ctor === 'Just')) {
-				var _p23 = _p22._1._0;
+			var _p21 = {ctor: '_Tuple2', _0: model.job, _1: build.job};
+			if (((_p21.ctor === '_Tuple2') && (_p21._0.ctor === 'Nothing')) && (_p21._1.ctor === 'Just')) {
+				var _p22 = _p21._1._0;
 				return _elm_lang$core$Platform_Cmd$batch(
 					_elm_lang$core$Native_List.fromArray(
 						[
-							_concourse$atc$Build$fetchBuildJobDetails(_p23),
-							A2(_concourse$atc$Build$fetchBuildHistory, _p23, _elm_lang$core$Maybe$Nothing)
+							_concourse$atc$Build$fetchBuildJobDetails(_p22),
+							A2(_concourse$atc$Build$fetchBuildHistory, _p22, _elm_lang$core$Maybe$Nothing)
 						]));
 			} else {
 				return _elm_lang$core$Platform_Cmd$none;
 			}
 		}();
 		var currentBuild = function () {
-			var _p24 = model.currentBuild;
-			if (_p24.ctor === 'Nothing') {
+			var _p23 = model.currentBuild;
+			if (_p23.ctor === 'Nothing') {
 				return {
 					buildOrOutput: _concourse$atc$Build$NoOutput(build),
 					prep: _elm_lang$core$Maybe$Nothing
 				};
 			} else {
 				return _elm_lang$core$Native_Utils.update(
-					_p24._0,
+					_p23._0,
 					{
 						buildOrOutput: _concourse$atc$Build$NoOutput(build)
 					});
@@ -15261,7 +15605,7 @@ var _concourse$atc$Build$handleBuildFetched = F2(
 			{
 				currentBuild: _elm_lang$core$Maybe$Just(currentBuild)
 			});
-		var _p25 = function () {
+		var _p24 = function () {
 			if (_elm_lang$core$Native_Utils.eq(build.status, _concourse$atc$Concourse_BuildStatus$Pending)) {
 				return {
 					ctor: '_Tuple2',
@@ -15270,18 +15614,18 @@ var _concourse$atc$Build$handleBuildFetched = F2(
 				};
 			} else {
 				if (_elm_lang$core$Native_Utils.eq(build.reapTime, _elm_lang$core$Maybe$Nothing)) {
-					var _p26 = A2(
+					var _p25 = A2(
 						_elm_lang$core$Maybe$andThen,
 						model.currentBuild,
 						function (_) {
 							return _.prep;
 						});
-					if (_p26.ctor === 'Nothing') {
+					if (_p25.ctor === 'Nothing') {
 						return A2(_concourse$atc$Build$initBuildOutput, build, withBuild);
 					} else {
-						var _p27 = A2(_concourse$atc$Build$initBuildOutput, build, withBuild);
-						var newModel = _p27._0;
-						var cmd = _p27._1;
+						var _p26 = A2(_concourse$atc$Build$initBuildOutput, build, withBuild);
+						var newModel = _p26._0;
+						var cmd = _p26._1;
 						return {
 							ctor: '_Tuple2',
 							_0: newModel,
@@ -15298,14 +15642,14 @@ var _concourse$atc$Build$handleBuildFetched = F2(
 				}
 			}
 		}();
-		var newModel = _p25._0;
-		var cmd = _p25._1;
+		var newModel = _p24._0;
+		var cmd = _p24._1;
 		return {
 			ctor: '_Tuple2',
 			_0: newModel,
 			_1: _elm_lang$core$Platform_Cmd$batch(
 				_elm_lang$core$Native_List.fromArray(
-					[cmd, fetchJobAndHistory]))
+					[cmd, updateBuildURL, fetchJobAndHistory]))
 		};
 	});
 var _concourse$atc$Build$AbortBuild = function (a) {
@@ -15370,13 +15714,13 @@ var _concourse$atc$Build$lazyViewHistory = F2(
 		return A3(_elm_lang$html$Html_Lazy$lazy2, _concourse$atc$Build$viewHistory, currentBuild, builds);
 	});
 var _concourse$atc$Build$viewBuildHeader = F2(
-	function (build, _p28) {
-		var _p29 = _p28;
-		var _p34 = _p29.job;
+	function (build, _p27) {
+		var _p28 = _p27;
+		var _p33 = _p28.job;
 		var buildTitle = function () {
-			var _p30 = build.job;
-			if (_p30.ctor === 'Just') {
-				var _p31 = _p30._0.name;
+			var _p29 = build.job;
+			if (_p29.ctor === 'Just') {
+				var _p30 = _p29._0.name;
 				return A2(
 					_elm_lang$html$Html$a,
 					_elm_lang$core$Native_List.fromArray(
@@ -15387,21 +15731,21 @@ var _concourse$atc$Build$viewBuildHeader = F2(
 								'/teams/',
 								A2(
 									_elm_lang$core$Basics_ops['++'],
-									_p30._0.teamName,
+									_p29._0.teamName,
 									A2(
 										_elm_lang$core$Basics_ops['++'],
 										'/pipelines/',
 										A2(
 											_elm_lang$core$Basics_ops['++'],
-											_p30._0.pipelineName,
-											A2(_elm_lang$core$Basics_ops['++'], '/jobs/', _p31))))))
+											_p29._0.pipelineName,
+											A2(_elm_lang$core$Basics_ops['++'], '/jobs/', _p30))))))
 						]),
 					_elm_lang$core$Native_List.fromArray(
 						[
 							_elm_lang$html$Html$text(
 							A2(
 								_elm_lang$core$Basics_ops['++'],
-								_p31,
+								_p30,
 								A2(_elm_lang$core$Basics_ops['++'], ' #', build.name)))
 						]));
 			} else {
@@ -15438,14 +15782,14 @@ var _concourse$atc$Build$viewBuildHeader = F2(
 			_elm_lang$core$Native_List.fromArray(
 				[]));
 		var triggerButton = function () {
-			var _p32 = _p34;
-			if (_p32.ctor === 'Just') {
+			var _p31 = _p33;
+			if (_p31.ctor === 'Just') {
 				var buttonDisabled = function () {
-					var _p33 = _p34;
-					if (_p33.ctor === 'Nothing') {
+					var _p32 = _p33;
+					if (_p32.ctor === 'Nothing') {
 						return true;
 					} else {
-						return _p33._0.disableManualTrigger;
+						return _p32._0.disableManualTrigger;
 					}
 				}();
 				var actionUrl = A2(
@@ -15453,17 +15797,17 @@ var _concourse$atc$Build$viewBuildHeader = F2(
 					'/teams/',
 					A2(
 						_elm_lang$core$Basics_ops['++'],
-						_p32._0.teamName,
+						_p31._0.teamName,
 						A2(
 							_elm_lang$core$Basics_ops['++'],
 							'/pipelines/',
 							A2(
 								_elm_lang$core$Basics_ops['++'],
-								_p32._0.pipelineName,
+								_p31._0.pipelineName,
 								A2(
 									_elm_lang$core$Basics_ops['++'],
 									'/jobs/',
-									A2(_elm_lang$core$Basics_ops['++'], _p32._0.name, '/builds'))))));
+									A2(_elm_lang$core$Basics_ops['++'], _p31._0.name, '/builds'))))));
 				return A2(
 					_elm_lang$html$Html$form,
 					_elm_lang$core$Native_List.fromArray(
@@ -15507,9 +15851,7 @@ var _concourse$atc$Build$viewBuildHeader = F2(
 			_elm_lang$html$Html$div,
 			_elm_lang$core$Native_List.fromArray(
 				[
-					_elm_lang$html$Html_Attributes$id('page-header'),
-					_elm_lang$html$Html_Attributes$class(
-					_concourse$atc$Concourse_BuildStatus$show(build.status))
+					_elm_lang$html$Html_Attributes$class('fixed-header')
 				]),
 			_elm_lang$core$Native_List.fromArray(
 				[
@@ -15517,7 +15859,11 @@ var _concourse$atc$Build$viewBuildHeader = F2(
 					_elm_lang$html$Html$div,
 					_elm_lang$core$Native_List.fromArray(
 						[
-							_elm_lang$html$Html_Attributes$class('build-header')
+							_elm_lang$html$Html_Attributes$class(
+							A2(
+								_elm_lang$core$Basics_ops['++'],
+								'build-header ',
+								_concourse$atc$Concourse_BuildStatus$show(build.status)))
 						]),
 					_elm_lang$core$Native_List.fromArray(
 						[
@@ -15535,7 +15881,7 @@ var _concourse$atc$Build$viewBuildHeader = F2(
 								[]),
 							_elm_lang$core$Native_List.fromArray(
 								[buildTitle])),
-							A2(_concourse$atc$BuildDuration$view, build.duration, _p29.now)
+							A2(_concourse$atc$BuildDuration$view, build.duration, _p28.now)
 						])),
 					A2(
 					_elm_lang$html$Html$div,
@@ -15549,48 +15895,49 @@ var _concourse$atc$Build$viewBuildHeader = F2(
 						]),
 					_elm_lang$core$Native_List.fromArray(
 						[
-							A2(_concourse$atc$Build$lazyViewHistory, build, _p29.history)
+							A2(_concourse$atc$Build$lazyViewHistory, build, _p28.history)
 						]))
 				]));
 	});
 var _concourse$atc$Build$view = function (model) {
-	var _p35 = model.currentBuild;
-	if (_p35.ctor === 'Just') {
-		var _p39 = _p35._0;
+	var _p34 = model.currentBuild;
+	if (_p34.ctor === 'Just') {
+		var _p38 = _p34._0;
 		return A2(
 			_elm_lang$html$Html$div,
 			_elm_lang$core$Native_List.fromArray(
-				[]),
+				[
+					_elm_lang$html$Html_Attributes$class('with-fixed-header')
+				]),
 			_elm_lang$core$Native_List.fromArray(
 				[
 					A2(
 					_concourse$atc$Build$viewBuildHeader,
-					_concourse$atc$Build$currentBuildBuild(_p39),
+					_concourse$atc$Build$currentBuildBuild(_p38),
 					model),
 					A2(
 					_elm_lang$html$Html$div,
-					A2(
-						_elm_lang$core$List_ops['::'],
-						_elm_lang$html$Html_Attributes$id('build-body'),
-						_concourse$atc$Build$paddingClass(
-							_concourse$atc$Build$currentBuildBuild(_p39))),
+					_elm_lang$core$Native_List.fromArray(
+						[
+							_elm_lang$html$Html_Attributes$class('scrollable-body')
+						]),
 					A2(
 						_elm_lang$core$Basics_ops['++'],
 						_elm_lang$core$Native_List.fromArray(
 							[
-								_concourse$atc$Build$viewBuildPrep(_p39.prep),
+								_concourse$atc$Build$viewBuildPrep(_p38.prep),
 								A2(
 								_elm_lang$html$Html_Lazy$lazy,
 								_concourse$atc$Build$viewBuildOutput,
-								_concourse$atc$Build$currentBuildOutput(_p39))
+								_concourse$atc$Build$currentBuildOutput(_p38))
 							]),
 						function () {
-							var build = _concourse$atc$Build$currentBuildBuild(_p39);
+							var build = _concourse$atc$Build$currentBuildBuild(_p38);
 							var maybeBirthDate = _elm_lang$core$Maybe$oneOf(
 								_elm_lang$core$Native_List.fromArray(
 									[build.duration.startedAt, build.duration.finishedAt]));
-							var _p36 = {ctor: '_Tuple2', _0: maybeBirthDate, _1: build.reapTime};
-							if (((_p36.ctor === '_Tuple2') && (_p36._0.ctor === 'Just')) && (_p36._1.ctor === 'Just')) {
+							var _p35 = {ctor: '_Tuple2', _0: maybeBirthDate, _1: build.reapTime};
+							if (((_p35.ctor === '_Tuple2') && (_p35._0.ctor === 'Just')) && (_p35._1.ctor === 'Just')) {
 								return _elm_lang$core$Native_List.fromArray(
 									[
 										A2(
@@ -15643,8 +15990,8 @@ var _concourse$atc$Build$view = function (model) {
 															_elm_lang$core$Basics_ops['++'],
 															'build #',
 															function () {
-																var _p37 = build.job;
-																if (_p37.ctor === 'Nothing') {
+																var _p36 = build.job;
+																if (_p36.ctor === 'Nothing') {
 																	return _elm_lang$core$Basics$toString(build.id);
 																} else {
 																	return build.name;
@@ -15662,11 +16009,11 @@ var _concourse$atc$Build$view = function (model) {
 														_elm_lang$html$Html$text(
 														A2(
 															_elm_lang$core$Basics_ops['++'],
-															_concourse$atc$Build$mmDDYY(_p36._0._0),
+															_concourse$atc$Build$mmDDYY(_p35._0._0),
 															A2(
 																_elm_lang$core$Basics_ops['++'],
 																'-',
-																_concourse$atc$Build$mmDDYY(_p36._1._0))))
+																_concourse$atc$Build$mmDDYY(_p35._1._0))))
 													])),
 												A2(
 												_elm_lang$html$Html$div,
@@ -15678,8 +16025,8 @@ var _concourse$atc$Build$view = function (model) {
 													[
 														_elm_lang$html$Html$text(
 														function () {
-															var _p38 = build.status;
-															switch (_p38.ctor) {
+															var _p37 = build.status;
+															switch (_p37.ctor) {
 																case 'Succeeded':
 																	return 'It passed, and now it has passed on.';
 																case 'Failed':
@@ -15727,65 +16074,65 @@ var _concourse$atc$Build$view = function (model) {
 };
 var _concourse$atc$Build$Noop = {ctor: 'Noop'};
 var _concourse$atc$Build$scrollBuilds = function (delta) {
-	return function (_p40) {
+	return function (_p39) {
 		return A2(
 			_elm_lang$core$Platform_Cmd$map,
 			_elm_lang$core$Basics$always(_concourse$atc$Build$Noop),
-			A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p40));
+			A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p39));
 	}(
 		A2(_concourse$atc$Scroll$scroll, 'builds', delta));
 };
-var _concourse$atc$Build$scrollToCurrentBuildInHistory = function (_p41) {
+var _concourse$atc$Build$scrollToCurrentBuildInHistory = function (_p40) {
 	return A2(
 		_elm_lang$core$Platform_Cmd$map,
 		_elm_lang$core$Basics$always(_concourse$atc$Build$Noop),
-		A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p41));
+		A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p40));
 }(
 	_concourse$atc$Scroll$scrollIntoView('#builds .current'));
 var _concourse$atc$Build$redirectToLogin = function (model) {
-	return function (_p42) {
+	return function (_p41) {
 		return A2(
 			_elm_lang$core$Platform_Cmd$map,
 			_elm_lang$core$Basics$always(_concourse$atc$Build$Noop),
-			A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p42));
+			A3(_elm_lang$core$Task$perform, _elm_lang$core$Result$Err, _elm_lang$core$Result$Ok, _p41));
 	}(
 		_concourse$atc$Redirect$to('/login'));
 };
 var _concourse$atc$Build$update = F2(
 	function (action, model) {
-		var _p43 = action;
-		switch (_p43.ctor) {
+		var _p42 = action;
+		switch (_p42.ctor) {
 			case 'Noop':
 				return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
 			case 'FetchBuild':
 				return {
 					ctor: '_Tuple2',
 					_0: model,
-					_1: A2(_concourse$atc$Build$fetchBuild, 0, _p43._0)
+					_1: A2(_concourse$atc$Build$fetchBuild, 0, _p42._0)
 				};
 			case 'BuildFetched':
-				if (_p43._0.ctor === 'Ok') {
-					return A2(_concourse$atc$Build$handleBuildFetched, _p43._0._0, model);
+				if (_p42._0.ctor === 'Ok') {
+					return A2(_concourse$atc$Build$handleBuildFetched, _p42._0._0, model);
 				} else {
 					return A2(
 						_elm_lang$core$Debug$log,
 						A2(
 							_elm_lang$core$Basics_ops['++'],
 							'failed to fetch build: ',
-							_elm_lang$core$Basics$toString(_p43._0._0)),
+							_elm_lang$core$Basics$toString(_p42._0._0)),
 						{ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none});
 				}
 			case 'AbortBuild':
 				return {
 					ctor: '_Tuple2',
 					_0: model,
-					_1: _concourse$atc$Build$abortBuild(_p43._0)
+					_1: _concourse$atc$Build$abortBuild(_p42._0)
 				};
 			case 'BuildAborted':
-				if (_p43._0.ctor === 'Ok') {
+				if (_p42._0.ctor === 'Ok') {
 					return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
 				} else {
-					if ((_p43._0._0.ctor === 'BadResponse') && (_p43._0._0._0 === 401)) {
+					if ((_p42._0._0.ctor === 'BadResponse') && (_p42._0._0._0 === 401)) {
 						return {
 							ctor: '_Tuple2',
 							_0: model,
@@ -15797,24 +16144,24 @@ var _concourse$atc$Build$update = F2(
 							A2(
 								_elm_lang$core$Basics_ops['++'],
 								'failed to abort build: ',
-								_elm_lang$core$Basics$toString(_p43._0._0)),
+								_elm_lang$core$Basics$toString(_p42._0._0)),
 							{ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none});
 					}
 				}
 			case 'BuildPrepFetched':
-				if (_p43._0.ctor === 'Ok') {
-					return A2(_concourse$atc$Build$handleBuildPrepFetched, _p43._0._0, model);
+				if (_p42._0.ctor === 'Ok') {
+					return A2(_concourse$atc$Build$handleBuildPrepFetched, _p42._0._0, model);
 				} else {
 					return A2(
 						_elm_lang$core$Debug$log,
 						A2(
 							_elm_lang$core$Basics_ops['++'],
 							'failed to fetch build preparation: ',
-							_elm_lang$core$Basics$toString(_p43._0._0)),
+							_elm_lang$core$Basics$toString(_p42._0._0)),
 						{ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none});
 				}
 			case 'BuildOutputAction':
-				var _p44 = {
+				var _p43 = {
 					ctor: '_Tuple2',
 					_0: model.currentBuild,
 					_1: A2(
@@ -15824,10 +16171,10 @@ var _concourse$atc$Build$update = F2(
 						},
 						model.currentBuild)
 				};
-				if ((((_p44.ctor === '_Tuple2') && (_p44._0.ctor === 'Just')) && (_p44._1.ctor === 'Just')) && (_p44._1._0.ctor === 'HasOutput')) {
-					var _p45 = A2(_concourse$atc$BuildOutput$update, _p43._0, _p44._1._0._0);
-					var newOutput = _p45._0;
-					var cmd = _p45._1;
+				if ((((_p43.ctor === '_Tuple2') && (_p43._0.ctor === 'Just')) && (_p43._1.ctor === 'Just')) && (_p43._1._0.ctor === 'HasOutput')) {
+					var _p44 = A2(_concourse$atc$BuildOutput$update, _p42._0, _p43._1._0._0);
+					var newOutput = _p44._0;
+					var cmd = _p44._1;
 					return {
 						ctor: '_Tuple2',
 						_0: _elm_lang$core$Native_Utils.update(
@@ -15835,7 +16182,7 @@ var _concourse$atc$Build$update = F2(
 							{
 								currentBuild: _elm_lang$core$Maybe$Just(
 									_elm_lang$core$Native_Utils.update(
-										_p44._0._0,
+										_p43._0._0,
 										{
 											buildOrOutput: _concourse$atc$Build$HasOutput(newOutput)
 										}))
@@ -15846,49 +16193,49 @@ var _concourse$atc$Build$update = F2(
 					return _elm_lang$core$Native_Utils.crashCase(
 						'Build',
 						{
-							start: {line: 133, column: 7},
-							end: {line: 144, column: 77}
+							start: {line: 134, column: 7},
+							end: {line: 145, column: 77}
 						},
-						_p44)('impossible (received action for missing BuildOutput)');
+						_p43)('impossible (received action for missing BuildOutput)');
 				}
 			case 'BuildHistoryFetched':
-				if (_p43._0.ctor === 'Err') {
+				if (_p42._0.ctor === 'Err') {
 					return A2(
 						_elm_lang$core$Debug$log,
 						A2(
 							_elm_lang$core$Basics_ops['++'],
 							'failed to fetch build history: ',
-							_elm_lang$core$Basics$toString(_p43._0._0)),
+							_elm_lang$core$Basics$toString(_p42._0._0)),
 						{ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none});
 				} else {
-					return A2(_concourse$atc$Build$handleHistoryFetched, _p43._0._0, model);
+					return A2(_concourse$atc$Build$handleHistoryFetched, _p42._0._0, model);
 				}
 			case 'BuildJobDetailsFetched':
-				if (_p43._0.ctor === 'Ok') {
-					return A2(_concourse$atc$Build$handleBuildJobFetched, _p43._0._0, model);
+				if (_p42._0.ctor === 'Ok') {
+					return A2(_concourse$atc$Build$handleBuildJobFetched, _p42._0._0, model);
 				} else {
 					return A2(
 						_elm_lang$core$Debug$log,
 						A2(
 							_elm_lang$core$Basics_ops['++'],
 							'failed to fetch build job details: ',
-							_elm_lang$core$Basics$toString(_p43._0._0)),
+							_elm_lang$core$Basics$toString(_p42._0._0)),
 						{ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none});
 				}
 			case 'RevealCurrentBuildInHistory':
 				return {ctor: '_Tuple2', _0: model, _1: _concourse$atc$Build$scrollToCurrentBuildInHistory};
 			case 'ScrollBuilds':
-				if (_p43._0._0 === 0) {
+				if (_p42._0._0 === 0) {
 					return {
 						ctor: '_Tuple2',
 						_0: model,
-						_1: _concourse$atc$Build$scrollBuilds(_p43._0._1)
+						_1: _concourse$atc$Build$scrollBuilds(_p42._0._1)
 					};
 				} else {
 					return {
 						ctor: '_Tuple2',
 						_0: model,
-						_1: _concourse$atc$Build$scrollBuilds(0 - _p43._0._0)
+						_1: _concourse$atc$Build$scrollBuilds(0 - _p42._0._0)
 					};
 				}
 			default:
@@ -15896,7 +16243,7 @@ var _concourse$atc$Build$update = F2(
 					ctor: '_Tuple2',
 					_0: _elm_lang$core$Native_Utils.update(
 						model,
-						{now: _p43._0}),
+						{now: _p42._0}),
 					_1: _elm_lang$core$Platform_Cmd$none
 				};
 		}
@@ -19356,7 +19703,9 @@ var _concourse$atc$Job$view = function (model) {
 	return A2(
 		_elm_lang$html$Html$div,
 		_elm_lang$core$Native_List.fromArray(
-			[]),
+			[
+				_elm_lang$html$Html_Attributes$class('with-fixed-header')
+			]),
 		_elm_lang$core$Native_List.fromArray(
 			[
 				function () {
@@ -19369,9 +19718,7 @@ var _concourse$atc$Job$view = function (model) {
 						_elm_lang$html$Html$div,
 						_elm_lang$core$Native_List.fromArray(
 							[
-								_elm_lang$html$Html_Attributes$id('page-header'),
-								_elm_lang$html$Html_Attributes$class(
-								_concourse$atc$Job$headerBuildStatusClass(_p14.finishedBuild))
+								_elm_lang$html$Html_Attributes$class('fixed-header')
 							]),
 						_elm_lang$core$Native_List.fromArray(
 							[
@@ -19379,7 +19726,11 @@ var _concourse$atc$Job$view = function (model) {
 								_elm_lang$html$Html$div,
 								_elm_lang$core$Native_List.fromArray(
 									[
-										_elm_lang$html$Html_Attributes$class('build-header')
+										_elm_lang$html$Html_Attributes$class(
+										A2(
+											_elm_lang$core$Basics_ops['++'],
+											'build-header ',
+											_concourse$atc$Job$headerBuildStatusClass(_p14.finishedBuild)))
 									]),
 								_elm_lang$core$Native_List.fromArray(
 									[
@@ -19471,23 +19822,7 @@ var _concourse$atc$Job$view = function (model) {
 											[
 												_elm_lang$html$Html$text(model.jobInfo.name)
 											]))
-									]))
-							]));
-				}
-			}(),
-				function () {
-				var _p15 = model.buildsWithResources;
-				if (_p15.ctor === 'Nothing') {
-					return _concourse$atc$Job$loadSpinner;
-				} else {
-					return A2(
-						_elm_lang$html$Html$div,
-						_elm_lang$core$Native_List.fromArray(
-							[
-								_elm_lang$html$Html_Attributes$id('job-body')
-							]),
-						_elm_lang$core$Native_List.fromArray(
-							[
+									])),
 								A2(
 								_elm_lang$html$Html$div,
 								_elm_lang$core$Native_List.fromArray(
@@ -19505,7 +19840,23 @@ var _concourse$atc$Job$view = function (model) {
 											[
 												_elm_lang$html$Html$text('builds')
 											]))
-									])),
+									]))
+							]));
+				}
+			}(),
+				function () {
+				var _p15 = model.buildsWithResources;
+				if (_p15.ctor === 'Nothing') {
+					return _concourse$atc$Job$loadSpinner;
+				} else {
+					return A2(
+						_elm_lang$html$Html$div,
+						_elm_lang$core$Native_List.fromArray(
+							[
+								_elm_lang$html$Html_Attributes$class('scrollable-body')
+							]),
+						_elm_lang$core$Native_List.fromArray(
+							[
 								A2(
 								_elm_lang$html$Html$ul,
 								_elm_lang$core$Native_List.fromArray(
@@ -19515,17 +19866,7 @@ var _concourse$atc$Job$view = function (model) {
 								A2(
 									_elm_lang$core$List$map,
 									_concourse$atc$Job$viewBuildWithResources(model),
-									_elm_lang$core$Array$toList(_p15._0))),
-								A2(
-								_elm_lang$html$Html$div,
-								_elm_lang$core$Native_List.fromArray(
-									[
-										_elm_lang$html$Html_Attributes$class('pagination-footer')
-									]),
-								_elm_lang$core$Native_List.fromArray(
-									[
-										_concourse$atc$Job$viewPaginationBar(model)
-									]))
+									_elm_lang$core$Array$toList(_p15._0)))
 							]));
 				}
 			}()

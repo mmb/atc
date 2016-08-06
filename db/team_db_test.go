@@ -191,6 +191,7 @@ var _ = Describe("TeamDB", func() {
 				savedPipeline1,
 			}))
 		})
+
 	})
 
 	Describe("OrderPipelines", func() {

@@ -11,6 +11,7 @@ import (
 //go:generate counterfeiter . TeamDB
 
 type TeamDB interface {
+	HasTeamName() bool
 	GetPipelines() ([]SavedPipeline, error)
 	GetPipelineByName(pipelineName string) (SavedPipeline, error)
 	GetAllPipelines() ([]SavedPipeline, error)
@@ -43,6 +44,10 @@ type teamDB struct {
 	buildFactory *buildFactory
 }
 
+func (db *teamDB) HasTeamName() bool {
+	return db.teamName != ""
+}
+
 func (db *teamDB) GetPipelineByName(pipelineName string) (SavedPipeline, error) {
 	row := db.conn.QueryRow(`
 		SELECT `+pipelineColumns+`
@@ -73,19 +78,7 @@ func (db *teamDB) GetPipelines() ([]SavedPipeline, error) {
 
 	defer rows.Close()
 
-	pipelines := []SavedPipeline{}
-
-	for rows.Next() {
-		pipeline, err := scanPipeline(rows)
-
-		if err != nil {
-			return nil, err
-		}
-
-		pipelines = append(pipelines, pipeline)
-	}
-
-	return pipelines, nil
+	return scanPipelines(rows)
 }
 
 func (db *teamDB) GetAllPipelines() ([]SavedPipeline, error) {
@@ -127,22 +120,6 @@ func (db *teamDB) GetAllPipelines() ([]SavedPipeline, error) {
 	}
 
 	return append(currentTeamPipelines, otherTeamPipelines...), nil
-}
-
-func scanPipelines(rows *sql.Rows) ([]SavedPipeline, error) {
-	pipelines := []SavedPipeline{}
-
-	for rows.Next() {
-		pipeline, err := scanPipeline(rows)
-
-		if err != nil {
-			return nil, err
-		}
-
-		pipelines = append(pipelines, pipeline)
-	}
-
-	return pipelines, nil
 }
 
 func (db *teamDB) OrderPipelines(pipelineNames []string) error {
@@ -790,6 +767,21 @@ func scanPipeline(rows scannable) (SavedPipeline, error) {
 			Version: ConfigVersion(version),
 		},
 	}, nil
+}
+
+func scanPipelines(rows *sql.Rows) ([]SavedPipeline, error) {
+	pipelines := []SavedPipeline{}
+
+	for rows.Next() {
+		pipeline, err := scanPipeline(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		pipelines = append(pipelines, pipeline)
+	}
+
+	return pipelines, nil
 }
 
 type PipelinePausedState string

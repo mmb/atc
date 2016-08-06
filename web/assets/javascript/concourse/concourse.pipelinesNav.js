@@ -1,8 +1,8 @@
 (function(sortable){
   concourse.PipelinesNav = function ($el) {
     this.$el = $($el);
-    this.$toggle = $el.find($('.js-pipelinesNav-toggle'));
-    this.$list = $el.find($('.js-pipelinesNav-list'));
+    this.$toggle = $el.find($('.js-sidebar-toggle'));
+    this.$list = $el.find($('.js-pipelines-list'));
     this.pipelinesEndpoint = '/api/v1/pipelines';
   };
 
@@ -41,7 +41,7 @@
   };
 
   concourse.PipelinesNav.prototype.toggle = function() {
-    $('body').toggleClass('pipelinesNav-visible');
+    $('.js-sidebar').toggleClass('visible');
   };
 
   concourse.PipelinesNav.prototype.loadPipelines = function() {
@@ -68,7 +68,7 @@
         _this.newPauseUnpause($pipelineListItem);
 
         if(concourse.pipelineName === pipeline.name && pipeline.paused) {
-          _this.$el.find('.js-groups').addClass('paused');
+          _this.$el.find('.js-top-bar').addClass('paused');
         }
       });
     });
@@ -78,11 +78,11 @@
     var _this = this;
     var pauseUnpause = new concourse.PauseUnpause($el, function() {
       if($el.data('pipelineName') === concourse.pipelineName) {
-        _this.$el.find('.js-groups').addClass('paused');
+        _this.$el.find('.js-top-bar').addClass('paused');
       }
     }, function() {
       if($el.data('pipelineName') === concourse.pipelineName) {
-        _this.$el.find('.js-groups').removeClass('paused');
+        _this.$el.find('.js-top-bar').removeClass('paused');
       }
     });
     pauseUnpause.bindEvents();
@@ -90,8 +90,8 @@
 })(Sortable);
 
 $(function () {
-  if ($('.js-pipelinesNav').length) {
-    var pipelinesNav = new concourse.PipelinesNav($('.js-pipelinesNav'));
-    pipelinesNav.bindEvents();
+  if ($('.js-with-pipeline').length) {
+    var withPipeline = new concourse.PipelinesNav($('.js-with-pipeline'));
+    withPipeline.bindEvents();
   }
 });

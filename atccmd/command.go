@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"code.cloudfoundry.org/clock"
+	"code.cloudfoundry.org/lager"
 	"github.com/concourse/atc"
 	"github.com/concourse/atc/api"
 	"github.com/concourse/atc/api/buildserver"
@@ -44,8 +46,6 @@ import (
 	"github.com/gorilla/context"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
-	"code.cloudfoundry.org/clock"
-	"code.cloudfoundry.org/lager"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/http_server"
@@ -717,28 +717,30 @@ func (cmd *ATCCommand) configureOAuthProviders(logger lager.Logger, teamDBFactor
 	return nil
 }
 
-func (cmd *ATCCommand) constructValidator(signingKey *rsa.PrivateKey, teamDBFactory db.TeamDBFactory) auth.Validator {
-	if !cmd.authConfigured() {
-		return auth.NoopValidator{}
-	}
-
-	jwtValidator := auth.JWTValidator{
-		PublicKey: &signingKey.PublicKey,
-	}
-
+func (cmd *ATCCommand) constructAuthValidator(teamDBFactory db.TeamDBFactory, tokenValidator auth.Validator) auth.Validator {
 	var validator auth.Validator
-	if cmd.BasicAuth.Username != "" && cmd.BasicAuth.Password != "" {
+	if cmd.basicAuthConfigured() {
 		validator = auth.ValidatorBasket{
 			auth.BasicAuthValidator{
 				TeamDBFactory: teamDBFactory,
 			},
-			jwtValidator,
+			tokenValidator,
 		}
 	} else {
-		validator = jwtValidator
+		validator = tokenValidator
 	}
 
 	return validator
+}
+
+func (cmd *ATCCommand) constructTokenValidator(publicKey *rsa.PublicKey) auth.Validator {
+	if !cmd.authConfigured() {
+		return auth.NoopValidator{}
+	}
+
+	return auth.JWTValidator{
+		PublicKey: publicKey,
+	}
 }
 
 func (cmd *ATCCommand) updateBasicAuthCredentials(teamDBFactory db.TeamDBFactory) error {
@@ -819,9 +821,13 @@ func (cmd *ATCCommand) constructAPIHandler(
 	radarScannerFactory radar.ScannerFactory,
 	devMode bool,
 ) (http.Handler, http.Handler, error) {
+	tokenValidator := cmd.constructTokenValidator(&signingKey.PublicKey)
+	authValidator := cmd.constructAuthValidator(teamDBFactory, tokenValidator)
+
 	apiWrapper := wrappa.MultiWrappa{
 		wrappa.NewAPIAuthWrappa(
-			cmd.constructValidator(signingKey, teamDBFactory),
+			authValidator,
+			tokenValidator,
 			auth.JWTReader{PublicKey: &signingKey.PublicKey, DevelopmentMode: devMode},
 		),
 		wrappa.NewAPIMetricsWrappa(logger),
@@ -850,6 +856,7 @@ func (cmd *ATCCommand) constructAPIHandler(
 		sqlDB, // containerserver.ContainerDB
 		sqlDB, // volumeserver.VolumesDB
 		sqlDB, // pipes.PipeDB
+		sqlDB, // db.PipelinesDB
 
 		config.ValidateConfig,
 		cmd.PeerURL.String(),
