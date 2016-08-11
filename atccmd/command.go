@@ -43,7 +43,6 @@ import (
 	"github.com/concourse/atc/worker/transport"
 	"github.com/concourse/atc/wrappa"
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/context"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/lib/pq"
 	"github.com/tedsuo/ifrit"
@@ -805,9 +804,6 @@ func (cmd *ATCCommand) constructHTTPHandler(
 		Handler: httpHandler,
 	}
 
-	// don't leak gorilla context per-request
-	httpHandler = context.ClearHandler(httpHandler)
-
 	return httpHandler
 }
 
@@ -829,12 +825,17 @@ func (cmd *ATCCommand) constructAPIHandler(
 	tokenValidator := cmd.constructTokenValidator(&signingKey.PublicKey)
 	authValidator := cmd.constructAuthValidator(teamDBFactory, tokenValidator)
 
+	checkPipelineAccessHandlerFactory := auth.NewCheckPipelineAccessHandlerFactory(
+		pipelineDBFactory,
+		teamDBFactory,
+	)
 	apiWrapper := wrappa.MultiWrappa{
 		wrappa.NewAPIMetricsWrappa(logger),
 		wrappa.NewAPIAuthWrappa(
 			authValidator,
 			tokenValidator,
 			auth.JWTReader{PublicKey: &signingKey.PublicKey, DevelopmentMode: devMode},
+			checkPipelineAccessHandlerFactory,
 		),
 		wrappa.NewConcourseVersionWrappa(Version),
 	}
