@@ -301,12 +301,10 @@ mapPipeline f pipelineName uip =
 
 view : Model -> Html Action
 view model =
-  Html.div [ class "sidebar js-sidebar" ]
-    [ case model.teams of
-        Nothing -> Html.text "loading"
-        Just teams ->
-          Html.ul [] <| List.map (viewTeam model.dragInfo) teams
-    ]
+  case model.teams of
+    Nothing -> Html.text "loading"
+    Just teams ->
+      Html.ul [] <| List.map (viewTeam model.dragInfo) teams
 
 viewTeam : Maybe DragInfo -> (String, List UIPipeline) -> Html Action
 viewTeam maybeDragInfo (teamName, pipelines) =

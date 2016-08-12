@@ -2,87 +2,86 @@
 
 @sidebarWidth: 300px;
 
-#pipelines-nav-app {
+.sidebar {
   overflow-y: auto;
+  overflow-x: hidden;
   width: @sidebarWidth;
+  background: @base00;
 
-  .sidebar {
-    display: none;
-    background: @base00;
-    line-height: 28px;
-    color: @base04;
+  display: none;
+  line-height: 28px;
+  color: @base04;
 
-    &.visible {
-      display: block;
-    }
+  &.visible {
+    display: block;
+  }
+
+  & ul{
+    list-style: none;
+    margin: 0px;
+  }
+
+  .team {
+
+    text-align: center;
 
     & ul{
-      list-style: none;
-      margin: 0px;
+      background-color: @base01;
+      border-bottom: 1px solid @base02;
+      border-top: 1px solid @base02;
     }
 
-    .team {
+    & li {
+      position: relative;
+      border-bottom: 1px solid @base02;
 
-      text-align: center;
-
-      & ul{
-        background-color: @base01;
-        border-bottom: 1px solid @base02;
-        border-top: 1px solid @base02;
+      &.space-after {
+        border-bottom: 3px solid @base03;
       }
 
-      & li {
-        position: relative;
-        border-bottom: 1px solid @base02;
+      &:first-of-type {
+        border-top: 1px solid @base02;
 
-        &.space-after {
-          border-bottom: 3px solid @base03;
+        &.space-before {
+          border-top: 3px solid @base03;
         }
+      }
 
-        &:first-of-type {
-          border-top: 1px solid @base02;
+      .drop-area {
+        position: absolute;
+        height: 100%;
+        width: 100%;
+        top: 50%;
+        background: transparent;
+        z-index: 2;
 
-          &.space-before {
-            border-top: 3px solid @base03;
-          }
-        }
-
-        .drop-area {
-          position: absolute;
-          height: 100%;
-          width: 100%;
-          top: 50%;
+        &.first {
           background: transparent;
-          z-index: 2;
+          top: -50%;
+        }
+      }
 
-          &.first {
-            background: transparent;
-            top: -50%;
+      .draggable {
+        position: relative;
+
+        & div {
+          background: @base00;
+          display: flex;
+          & span {
+            flex-grow: 0;
+          }
+          & a {
+            flex-grow: 1;
+            text-align: right;
+            padding-right: 10px;
           }
         }
 
-        .draggable {
-          position: relative;
+        &.dragging {
+          z-index: 1;
 
-          & div {
-            background: @base00;
-            display: flex;
-            & span {
-              flex-grow: 0;
-            }
-            & a {
-              flex-grow: 1;
-              text-align: right;
-              padding-right: 10px;
-            }
-          }
-
-          &.dragging {
-            z-index: 1;
-
-            &.purposeful {
-              opacity: 0.75;
-            }
+          &.purposeful {
+            opacity: 0.75;
           }
         }
       }
