@@ -271,10 +271,14 @@ setPaused : Bool -> UIPipeline -> UIPipeline
 setPaused paused uip =
   -- arbitrary elm restriction: record update syntax only works on local variables
   let pipeline = uip.pipeline in
-    { uip | pipeline = { pipeline | paused = paused }, pausedChanging = False }
+    { uip
+    | pipeline = { pipeline | paused = paused }
+    , pausedChanging = False
+    , pauseErrored = False
+    }
 
 updatePausedChanging : UIPipeline -> UIPipeline
-updatePausedChanging uip = {uip | pausedChanging = True, pauseErrored = False}
+updatePausedChanging uip = {uip | pausedChanging = True}
 
 updatePauseErrored : UIPipeline -> UIPipeline
 updatePauseErrored uip = {uip | pauseErrored = True, pausedChanging = False}
@@ -315,22 +319,22 @@ viewTeam maybeDragInfo (teamName, pipelines) =
             Nothing -> []
             Just firstElem ->
               let
-                firstElemView = viewFirstPipeline maybeDragInfo teamName firstElem
+                firstElemView = viewFirstPipeline maybeDragInfo firstElem
               in let
                 restView =
                   List.map
-                    (viewPipeline maybeDragInfo teamName) <|
+                    (viewPipeline maybeDragInfo) <|
                       Maybe.withDefault [] <| List.tail pipelines
               in
                 firstElemView :: restView
     ]
 
-viewFirstPipeline : Maybe DragInfo -> String -> UIPipeline -> Html Action
-viewFirstPipeline maybeDragInfo teamName uip =
+viewFirstPipeline : Maybe DragInfo -> UIPipeline -> Html Action
+viewFirstPipeline maybeDragInfo uip =
   Html.li
     ( case maybeDragInfo of
         Just dragInfo ->
-          if dragInfo.teamName == teamName then
+          if dragInfo.teamName == uip.pipeline.teamName then
             case dragInfo.hover of
               Just hover ->
                 if hover == BeforeAll then
@@ -344,19 +348,19 @@ viewFirstPipeline maybeDragInfo teamName uip =
         Nothing -> []
     ) <|
     ( if isPurposeful maybeDragInfo then
-        [ viewFirstDropArea teamName uip.pipeline.name
-        , viewDropArea teamName uip.pipeline.name
+        [ viewFirstDropArea uip.pipeline.teamName
+        , viewDropArea uip.pipeline.teamName uip.pipeline.name
         ]
       else []
     ) ++
-      [ viewDraggable maybeDragInfo teamName uip ]
+      [ viewDraggable maybeDragInfo uip ]
 
-viewPipeline : Maybe DragInfo -> String -> UIPipeline -> Html Action
-viewPipeline maybeDragInfo teamName uip =
+viewPipeline : Maybe DragInfo -> UIPipeline -> Html Action
+viewPipeline maybeDragInfo uip =
   Html.li
     ( case maybeDragInfo of
         Just dragInfo ->
-          if dragInfo.teamName == teamName then
+          if dragInfo.teamName == uip.pipeline.teamName then
             case dragInfo.hover of
               Just hover ->
                 if hover == AfterElement uip.pipeline.name then
@@ -368,36 +372,47 @@ viewPipeline maybeDragInfo teamName uip =
         Nothing -> []
     )<|
     ( if isPurposeful maybeDragInfo then
-        [ viewDropArea teamName uip.pipeline.name ]
+        [ viewDropArea uip.pipeline.teamName uip.pipeline.name ]
       else []
     ) ++
-      [ viewDraggable maybeDragInfo teamName uip ]
+      [ viewDraggable maybeDragInfo uip ]
 
-viewDraggable : Maybe DragInfo -> String -> UIPipeline -> Html Action
-viewDraggable maybeDragInfo teamName uip =
+viewDraggable : Maybe DragInfo -> UIPipeline -> Html Action
+viewDraggable maybeDragInfo uip =
   Html.div
-    ( [ class "draggable"
-      , Events.onWithOptions
-          "mousedown"
-          { stopPropagation = False, preventDefault = True } <|
-          Json.Decode.map (StartDragging teamName uip.pipeline.name) Mouse.position
-      ] ++
-        case maybeDragInfo of
-          Just dragInfo ->
-            if dragInfo.teamName == teamName && dragInfo.pipelineName == uip.pipeline.name then
-              [ dragStyle dragInfo ]
-            else []
-          Nothing -> []
+    ( let
+        dragging =
+          case maybeDragInfo of
+            Just dragInfo ->
+              dragInfo.teamName == uip.pipeline.teamName &&
+                dragInfo.pipelineName == uip.pipeline.name
+            Nothing -> False
+      in
+        [ class <|
+            if dragging then
+              if isPurposeful maybeDragInfo then "draggable dragging purposeful"
+              else "draggable dragging"
+            else "draggable"
+        , Events.onWithOptions
+            "mousedown"
+            { stopPropagation = False, preventDefault = True } <|
+            Json.Decode.map (StartDragging uip.pipeline.teamName uip.pipeline.name) Mouse.position
+        ] ++
+          case (maybeDragInfo, dragging) of
+            (Just dragInfo, True) -> [ dragStyle dragInfo ]
+            _ -> []
     )
-    [ viewPauseButton uip
-    , Html.a
-        ( [ href uip.pipeline.url ] ++
-          if isPurposeful maybeDragInfo then
-            [ ignoreClicks ]
-          else
-            []
-        )
-        [ Html.text uip.pipeline.name ]
+    [ Html.div []
+        [ viewPauseButton uip
+        , Html.a
+            ( [ href uip.pipeline.url ] ++
+              if isPurposeful maybeDragInfo then
+                [ ignoreClicks ]
+              else
+                []
+            )
+            [ Html.text uip.pipeline.name ]
+        ]
     ]
 
 dragStyle : DragInfo -> Html.Attribute action
@@ -407,8 +422,8 @@ dragStyle dragInfo =
     , ("top", toString (dragY dragInfo) ++ "px")
     ]
 
-viewFirstDropArea : String -> String -> Html Action
-viewFirstDropArea teamName pipelineName =
+viewFirstDropArea : String -> Html Action
+viewFirstDropArea teamName =
   Html.div
     [ class "drop-area first"
     , Events.onMouseEnter <| Hover teamName BeforeAll
@@ -437,11 +452,9 @@ viewPauseButton uip =
   if uip.pipeline.paused then
     Html.span
       [ Events.onClick <| UnpausePipeline uip.pipeline.teamName uip.pipeline.name
-      , Html.Attributes.style
-          [ ("backgroundColor"
-            , if uip.pauseErrored then "orange" else "blue"
-            )
-          ]
+      , class <|
+          if uip.pauseErrored then "btn-pause errored"
+          else "btn-pause enabled"
       ] <|
       if uip.pausedChanging then
         [ Html.i [class "fa fa-fw fa-circle-o-notch fa-spin"] [] ]
@@ -450,11 +463,9 @@ viewPauseButton uip =
   else
     Html.span
       [ Events.onClick <| PausePipeline uip.pipeline.teamName uip.pipeline.name
-      , Html.Attributes.style
-          [ ("backgroundColor"
-            , if uip.pauseErrored then "orange" else "blue"
-            )
-          ]
+      , class <|
+          if uip.pauseErrored then "btn-pause errored"
+          else "btn-pause disabled"
       ] <|
       if uip.pausedChanging then
         [ Html.i [class "fa fa-fw fa-circle-o-notch fa-spin"] [] ]
