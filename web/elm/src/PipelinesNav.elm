@@ -311,7 +311,11 @@ view model =
 viewTeam : Maybe DragInfo -> (String, List UIPipeline) -> Html Action
 viewTeam maybeDragInfo (teamName, pipelines) =
   Html.li [class "team"]
-    [ Html.text teamName
+    [ Html.text <| "team "
+      , Html.span
+        [ class "bright-text" ]
+        [ Html.text teamName ]
+
     , Html.ul [] <|
       let firstElem = List.head pipelines
         in
