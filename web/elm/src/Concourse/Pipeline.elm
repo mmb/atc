@@ -1,7 +1,8 @@
-module Concourse.Pipeline exposing (Pipeline, fetchPipelines, pause, unpause)
+module Concourse.Pipeline exposing (Pipeline, fetchPipelines, pause, unpause, order)
 
 import Http
 import Json.Decode exposing ((:=))
+import Json.Encode
 import Task exposing (Task)
 
 type alias Pipeline =
@@ -11,6 +12,23 @@ type alias Pipeline =
   , public : Bool
   , teamName : String
   }
+
+order : String -> List String -> Task Http.Error ()
+order teamName pipelineNames =
+  let jsonifiedPipelineNames =
+    List.map Json.Encode.string pipelineNames
+  in let
+    body = Json.Encode.encode 0 <| Json.Encode.list jsonifiedPipelineNames
+  in let
+    post =
+      Http.send Http.defaultSettings
+        { verb = "PUT"
+        , headers = []
+        , url = "/api/v1/teams/" ++ teamName ++ "/pipelines/ordering"
+        , body = Http.string body
+        }
+  in
+    Task.mapError promoteHttpError post `Task.andThen` handleResponse
 
 fetchPipelines : Task Http.Error (List Pipeline)
 fetchPipelines = Http.get (Json.Decode.list decode) "/api/v1/pipelines"

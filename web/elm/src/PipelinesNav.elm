@@ -50,6 +50,7 @@ type Action
   | Drag Position
   | Hover String (ListHover String)
   | Unhover String (ListHover String)
+  | PipelinesReordered (Result Http.Error ())
 
 init : (Model, Cmd Action)
 init =
@@ -131,29 +132,30 @@ update action model =
     StopDragging pos ->
       case model.dragInfo of
         Just dragInfo ->
-          ( { model
-            | dragInfo = Nothing
-            , teams =
-              case dragInfo.hover of
-                Just hover ->
-                  case getPipelinesByTeamName dragInfo.teamName model.teams of
-                    Just pipelines ->
-                      case popPipelineByName dragInfo.pipelineName pipelines of
-                        (tmpPipelines, Just draggedPipeline) ->
-                          let
-                            updatedPipelines =
-                              insertPipelineAt hover draggedPipeline tmpPipelines
-                          in
-                            setPipelinesByTeamName
-                              dragInfo.teamName
-                              updatedPipelines
-                              model.teams
-                        (_, Nothing) -> model.teams
-                    Nothing -> model.teams
-                Nothing -> model.teams
-            }
-          , Cmd.none
-          )
+          case dragInfo.hover of
+            Just hover ->
+              case getPipelinesByTeamName dragInfo.teamName model.teams of
+                Just pipelines ->
+                  case popPipelineByName dragInfo.pipelineName pipelines of
+                    (tmpPipelines, Just draggedPipeline) ->
+                      let
+                        updatedPipelines =
+                          insertPipelineAt hover draggedPipeline tmpPipelines
+                      in
+                        ( { model
+                          | dragInfo = Nothing
+                          , teams =
+                              setPipelinesByTeamName
+                                dragInfo.teamName
+                                updatedPipelines
+                                model.teams
+                          }
+                        , orderPipelines dragInfo.teamName <|
+                          List.map (.pipeline >> .name) updatedPipelines
+                        )
+                    (_, Nothing) -> (model, Cmd.none)
+                Nothing -> (model, Cmd.none)
+            Nothing -> (model, Cmd.none)
         Nothing -> (model, Cmd.none)
     Hover teamName listHover ->
       case model.dragInfo of
@@ -179,6 +181,10 @@ update action model =
             )
           else (model, Cmd.none)
         Nothing -> (model, Cmd.none)
+    PipelinesReordered (Ok ()) ->
+      (model, Cmd.none)
+    PipelinesReordered (Err err) ->
+      Debug.log ("failed to reorder pipelines: " ++ toString err) (model, Cmd.none)
 
 getPrevHover : Model -> Maybe (ListHover String)
 getPrevHover model =
@@ -465,6 +471,11 @@ pausePipeline : String -> String -> Cmd Action
 pausePipeline teamName pipelineName =
   Cmd.map (PipelinePaused teamName pipelineName) <|
     Task.perform Err Ok <| Concourse.Pipeline.pause teamName pipelineName
+
+orderPipelines : String -> List String -> Cmd Action
+orderPipelines teamName pipelineNames =
+  Cmd.map PipelinesReordered <|
+    Task.perform Err Ok <| Concourse.Pipeline.order teamName pipelineNames
 
 groupPipelinesByTeam : List Pipeline -> List (String, List UIPipeline)
 groupPipelinesByTeam pipelines =
