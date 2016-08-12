@@ -153,9 +153,9 @@ update action model =
                         , orderPipelines dragInfo.teamName <|
                           List.map (.pipeline >> .name) updatedPipelines
                         )
-                    (_, Nothing) -> (model, Cmd.none)
-                Nothing -> (model, Cmd.none)
-            Nothing -> (model, Cmd.none)
+                    (_, Nothing) -> ({ model | dragInfo = Nothing }, Cmd.none)
+                Nothing -> ({ model | dragInfo = Nothing }, Cmd.none)
+            Nothing -> ({ model | dragInfo = Nothing }, Cmd.none)
         Nothing -> (model, Cmd.none)
     Hover teamName listHover ->
       case model.dragInfo of
@@ -330,15 +330,17 @@ viewFirstPipeline maybeDragInfo teamName uip =
   Html.li
     ( case maybeDragInfo of
         Just dragInfo ->
-          case dragInfo.hover of
-            Just hover ->
-              if hover == BeforeAll then
-                [ class "space-before" ]
-              else if hover == AfterElement uip.pipeline.name then
-                [ class "space-after" ]
-              else
-                []
-            Nothing -> []
+          if dragInfo.teamName == teamName then
+            case dragInfo.hover of
+              Just hover ->
+                if hover == BeforeAll then
+                  [ class "space-before" ]
+                else if hover == AfterElement uip.pipeline.name then
+                  [ class "space-after" ]
+                else
+                  []
+              Nothing -> []
+          else []
         Nothing -> []
     ) <|
     ( if isPurposeful maybeDragInfo then
@@ -354,13 +356,15 @@ viewPipeline maybeDragInfo teamName uip =
   Html.li
     ( case maybeDragInfo of
         Just dragInfo ->
-          case dragInfo.hover of
-            Just hover ->
-              if hover == AfterElement uip.pipeline.name then
-                [ class "space-after" ]
-              else
-                []
-            Nothing -> []
+          if dragInfo.teamName == teamName then
+            case dragInfo.hover of
+              Just hover ->
+                if hover == AfterElement uip.pipeline.name then
+                  [ class "space-after" ]
+                else
+                  []
+              Nothing -> []
+          else []
         Nothing -> []
     )<|
     ( if isPurposeful maybeDragInfo then
