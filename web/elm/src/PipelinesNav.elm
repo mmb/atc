@@ -25,7 +25,7 @@ type alias DragInfo =
   , teamName : String
   , pipelineName : String
   , purposeful : Bool
-  , hover : Maybe (String, ListHover String)
+  , hover : Maybe (ListHover String)
   }
 
 type alias UIPipeline =
@@ -129,19 +129,40 @@ update action model =
         ) <|
         Debug.log "start" pos
     StopDragging pos ->
-      always
-        ( { model | dragInfo = Nothing }
-        , Cmd.none
-        ) <|
-        Debug.log "done" pos
+      case model.dragInfo of
+        Just dragInfo ->
+          ( { model
+            | dragInfo = Nothing
+            , teams =
+              case dragInfo.hover of
+                Just hover ->
+                  case getPipelinesByTeamName dragInfo.teamName model.teams of
+                    Just pipelines ->
+                      case popPipelineByName dragInfo.pipelineName pipelines of
+                        (tmpPipelines, Just draggedPipeline) ->
+                          let
+                            updatedPipelines =
+                              insertPipelineAt hover draggedPipeline tmpPipelines
+                          in
+                            setPipelinesByTeamName
+                              dragInfo.teamName
+                              updatedPipelines
+                              model.teams
+                        (_, Nothing) -> model.teams
+                    Nothing -> model.teams
+                Nothing -> model.teams
+            }
+          , Cmd.none
+          )
+        Nothing -> (model, Cmd.none)
     Hover teamName listHover ->
       case model.dragInfo of
         Just dragInfo ->
           if dragInfo.teamName == teamName &&
             listHover /= AfterElement dragInfo.pipelineName &&
-            getPrevHover model /= Just listHover then
+            (getPrevHover model) /= Just listHover then
             ( { model
-              | dragInfo = Just { dragInfo | hover = Just (teamName, listHover) }
+              | dragInfo = Just { dragInfo | hover = Just listHover }
               }
             , Cmd.none
             )
@@ -150,7 +171,7 @@ update action model =
     Unhover teamName listHover ->
       case model.dragInfo of
         Just dragInfo ->
-          if dragInfo.hover == Just (teamName, listHover) then
+          if dragInfo.hover == Just listHover then
             ( { model
               | dragInfo = Just { dragInfo | hover = Nothing }
               }
@@ -163,17 +184,10 @@ getPrevHover : Model -> Maybe (ListHover String)
 getPrevHover model =
   case model.dragInfo of
     Just dragInfo ->
-      Maybe.oneOf <|
-        List.map
-          (getPrevHoverForTeam dragInfo.teamName dragInfo.pipelineName) <|
-          Maybe.withDefault [] model.teams
+      Maybe.andThen
+        (getPipelinesByTeamName dragInfo.teamName model.teams) <|
+        getPrevHoverForPipelines dragInfo.pipelineName
     Nothing -> Nothing
-
-getPrevHoverForTeam : String -> String -> (String, List UIPipeline) -> Maybe (ListHover String)
-getPrevHoverForTeam teamName pipelineName (actualTeamName, pipelines) =
-  if actualTeamName == teamName then
-    getPrevHoverForPipelines pipelineName pipelines
-  else Nothing
 
 getPrevHoverForPipelines : String -> List UIPipeline -> Maybe (ListHover String)
 getPrevHoverForPipelines pipelineName pipelines =
@@ -188,6 +202,52 @@ getPrevHoverForPipelines pipelineName pipelines =
       else
         getPrevHoverForPipelines pipelineName <| second :: rest
 
+getPipelinesByTeamName :
+  String -> Maybe (List (String, List UIPipeline)) -> Maybe (List UIPipeline)
+getPipelinesByTeamName teamName teams =
+  Maybe.map
+    snd <|
+    List.head <|
+      List.filter
+        (\team -> fst team == teamName) <|
+        Maybe.withDefault [] teams
+
+setPipelinesByTeamName :
+  String -> List UIPipeline -> Maybe (List (String, List UIPipeline)) ->
+    Maybe (List (String, List UIPipeline))
+setPipelinesByTeamName teamName newPipelines teams =
+  Maybe.map (setPipelinesByTeamNameHelper teamName newPipelines) teams
+
+setPipelinesByTeamNameHelper :
+  String -> List UIPipeline -> List (String, List UIPipeline) ->
+    List (String, List UIPipeline)
+setPipelinesByTeamNameHelper teamName newPipelines teams =
+  case teams of
+    [] -> []
+    team :: rest ->
+      if fst team == teamName then (fst team, newPipelines) :: rest
+      else team :: setPipelinesByTeamNameHelper teamName newPipelines rest
+
+popPipelineByName : String -> List UIPipeline -> (List UIPipeline, Maybe UIPipeline)
+popPipelineByName name pipelines =
+  case pipelines of
+    [] -> ([], Nothing)
+    first :: rest ->
+      if first.pipeline.name == name then (rest, Just first)
+      else
+        let (updatedRest, poppedPipeline) = popPipelineByName name rest in
+          (first :: updatedRest, poppedPipeline)
+
+insertPipelineAt : ListHover String -> UIPipeline -> List UIPipeline -> List UIPipeline
+insertPipelineAt location pipeline pipelines =
+  case location of
+    BeforeAll -> pipeline :: pipelines
+    AfterElement name ->
+      case pipelines of
+        [] -> []
+        first :: rest ->
+          if first.pipeline.name == name then first :: pipeline :: rest
+          else first :: (insertPipelineAt location pipeline rest)
 
 dragX : DragInfo -> Int
 dragX dragInfo = dragInfo.pos.x - dragInfo.startPos.x
@@ -207,29 +267,22 @@ setPaused paused uip =
   let pipeline = uip.pipeline in
     { uip | pipeline = { pipeline | paused = paused }, pausedChanging = False }
 
-mapModelPipelines : (UIPipeline -> UIPipeline) -> String -> String -> Model -> Model
-mapModelPipelines f teamName pipelineName model =
-  { model
-  | teams =
-      Maybe.map
-        (List.map <| mapTeamPipelines f teamName pipelineName)
-        model.teams
-  }
-
 updatePausedChanging : UIPipeline -> UIPipeline
 updatePausedChanging uip = {uip | pausedChanging = True, pauseErrored = False}
 
 updatePauseErrored : UIPipeline -> UIPipeline
 updatePauseErrored uip = {uip | pauseErrored = True, pausedChanging = False}
 
-mapTeamPipelines :
-  (UIPipeline -> UIPipeline) -> String -> String -> (String, List UIPipeline) -> (String, List UIPipeline)
-mapTeamPipelines f teamName pipelineName (actualTeamName, pipelines) =
-  ( actualTeamName
-  , if actualTeamName == teamName then
-      List.map (mapPipeline f pipelineName) pipelines
-    else pipelines
-  )
+mapModelPipelines : (UIPipeline -> UIPipeline) -> String -> String -> Model -> Model
+mapModelPipelines f teamName pipelineName model =
+  let maybePipelines = getPipelinesByTeamName teamName model.teams in
+    case maybePipelines of
+      Nothing -> model
+      Just pipelines ->
+        let newPipelines = List.map (mapPipeline f pipelineName) pipelines in
+          { model
+          | teams = setPipelinesByTeamName teamName newPipelines model.teams
+          }
 
 mapPipeline : (UIPipeline -> UIPipeline) -> String -> UIPipeline -> UIPipeline
 mapPipeline f pipelineName uip =
@@ -273,9 +326,9 @@ viewFirstPipeline maybeDragInfo teamName uip =
         Just dragInfo ->
           case dragInfo.hover of
             Just hover ->
-              if hover == (teamName, BeforeAll) then
+              if hover == BeforeAll then
                 [ class "space-before" ]
-              else if hover == (teamName, AfterElement uip.pipeline.name) then
+              else if hover == AfterElement uip.pipeline.name then
                 [ class "space-after" ]
               else
                 []
@@ -297,7 +350,7 @@ viewPipeline maybeDragInfo teamName uip =
         Just dragInfo ->
           case dragInfo.hover of
             Just hover ->
-              if hover == (teamName, AfterElement uip.pipeline.name) then
+              if hover == AfterElement uip.pipeline.name then
                 [ class "space-after" ]
               else
                 []
