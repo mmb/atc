@@ -2,10 +2,13 @@ package algorithm
 
 import (
 	"fmt"
+	"log"
 	"strings"
 )
 
 type InputCandidates []InputVersionCandidates
+
+type ResolvedInputs map[string]int
 
 type InputVersionCandidates struct {
 	Input                 string
@@ -33,77 +36,102 @@ const VersionEvery = "every"
 func (candidates InputCandidates) String() string {
 	lens := []string{}
 	for _, vcs := range candidates {
-		lens = append(lens, fmt.Sprintf("%s (%d candidates for %d versions)", vcs.Input, len(vcs.VersionCandidates), len(vcs.VersionIDs())))
+		lens = append(lens, fmt.Sprintf("%s (%d versions)", vcs.Input, vcs.VersionCandidates.Len()))
 	}
 
 	return fmt.Sprintf("[%s]", strings.Join(lens, "; "))
 }
 
-func (candidates InputCandidates) Reduce(jobs JobSet) (map[string]int, bool) {
+func (candidates InputCandidates) Reduce(jobs JobSet) (ResolvedInputs, bool) {
 	return candidates.reduce(jobs, nil)
 }
 
-func (candidates InputCandidates) reduce(jobs JobSet, lastSatisfiedMapping map[string]int) (map[string]int, bool) {
+func (candidates InputCandidates) Pin(input int, version int) {
+	limitedToVersion := candidates[input].ForVersion(version)
+
+	inputCandidates := candidates[input]
+	inputCandidates.VersionCandidates = limitedToVersion
+	candidates[input] = inputCandidates
+}
+
+func (candidates InputCandidates) Unpin(input int, inputCandidates InputVersionCandidates) {
+	candidates[input] = inputCandidates
+}
+
+func shouldRunNext(
+	version int,
+	versionIDs *VersionsIter,
+	inputVersionCandidates InputVersionCandidates,
+) bool {
+	if !inputVersionCandidates.UsingEveryVersion() {
+		return true
+	}
+
+	if inputVersionCandidates.ExistingBuildResolver.ExistsForVersion(version) {
+		return true
+	}
+
+	next, hasNext := versionIDs.Peek()
+	log.Println("NEXT", next, hasNext)
+	return !hasNext ||
+		inputVersionCandidates.ExistingBuildResolver.ExistsForVersion(next)
+}
+
+func (candidates InputCandidates) reduce(jobs JobSet, lastResolved ResolvedInputs) (ResolvedInputs, bool) {
 	newInputCandidates := candidates.pruneToCommonBuilds(jobs)
 
 	for i, inputVersionCandidates := range newInputCandidates {
-		versionIDs := inputVersionCandidates.VersionIDs()
-
-		switch {
-		case len(versionIDs) == 1:
+		if inputVersionCandidates.Len() == 1 {
 			// already reduced
 			continue
-		case inputVersionCandidates.PinnedVersionID != 0:
-			limitedToVersion := inputVersionCandidates.ForVersion(inputVersionCandidates.PinnedVersionID)
+		}
 
-			inputCandidates := newInputCandidates[i]
-			inputCandidates.VersionCandidates = limitedToVersion
-			newInputCandidates[i] = inputCandidates
-		default:
-			usingEveryVersion := inputVersionCandidates.UsingEveryVersion()
+		if inputVersionCandidates.PinnedVersionID != 0 {
+			newInputCandidates.Pin(i, inputVersionCandidates.PinnedVersionID)
+			continue
+		}
 
-			for j, id := range versionIDs {
-				buildForPreviousOrCurrentVersionExists := func() bool {
-					return inputVersionCandidates.ExistingBuildResolver.ExistsForVersion(id) ||
-						j == len(versionIDs)-1 ||
-						inputVersionCandidates.ExistingBuildResolver.ExistsForVersion(versionIDs[j+1])
-				}
+		versionIDs := inputVersionCandidates.VersionIDs()
 
-				limitedToVersion := inputVersionCandidates.ForVersion(id)
-
-				inputCandidates := newInputCandidates[i]
-				inputCandidates.VersionCandidates = limitedToVersion
-				newInputCandidates[i] = inputCandidates
-
-				mapping, ok := newInputCandidates.reduce(jobs, lastSatisfiedMapping)
-				if ok {
-					lastSatisfiedMapping = mapping
-					if !usingEveryVersion || buildForPreviousOrCurrentVersionExists() {
-						return mapping, true
-					}
-				} else {
-					if usingEveryVersion && (lastSatisfiedMapping != nil || buildForPreviousOrCurrentVersionExists()) {
-						return lastSatisfiedMapping, true
-					}
-				}
-
-				newInputCandidates[i] = inputVersionCandidates
+		for {
+			id, ok := versionIDs.Next()
+			if !ok {
+				break
 			}
+
+			newInputCandidates.Pin(i, id)
+
+			mapping, ok := newInputCandidates.reduce(jobs, lastResolved)
+			if ok {
+				// TODO weird shadowing here?
+				// lastSatisfiedMapping = mapping
+				if shouldRunNext(id, versionIDs, inputVersionCandidates) {
+					return mapping, true
+				}
+			} // else {
+			// if lastResolved != nil {
+			// 	return lastResolved, true
+			// }
+			// }
+
+			newInputCandidates.Unpin(i, inputVersionCandidates)
 		}
 	}
 
-	mapping := map[string]int{}
+	resolved := ResolvedInputs{}
 
 	for _, inputVersionCandidates := range newInputCandidates {
-		versionIDs := inputVersionCandidates.VersionIDs()
-		if len(versionIDs) != 1 || !inputVersionCandidates.JobIDs().Equal(inputVersionCandidates.Passed) {
+		vids := inputVersionCandidates.VersionIDs()
+
+		vid, ok := vids.Next()
+		if !ok {
 			return nil, false
 		}
 
-		mapping[inputVersionCandidates.Input] = versionIDs[0]
+		resolved[inputVersionCandidates.Input] = vid
 	}
 
-	return mapping, true
+	return resolved, true
 }
 
 func (candidates InputCandidates) pruneToCommonBuilds(jobs JobSet) InputCandidates {
@@ -126,7 +154,7 @@ func (candidates InputCandidates) pruneToCommonBuilds(jobs JobSet) InputCandidat
 func (candidates InputCandidates) commonBuildIDs(jobID int) BuildSet {
 	firstTick := true
 
-	var commonBuildIDs BuildSet
+	commonBuildIDs := BuildSet{}
 
 	for _, set := range candidates {
 		setBuildIDs := set.BuildIDs(jobID)
@@ -135,9 +163,16 @@ func (candidates InputCandidates) commonBuildIDs(jobID int) BuildSet {
 		}
 
 		if firstTick {
-			commonBuildIDs = setBuildIDs
+			for id := range setBuildIDs {
+				commonBuildIDs[id] = struct{}{}
+			}
 		} else {
-			commonBuildIDs = commonBuildIDs.Intersect(setBuildIDs)
+			for id := range commonBuildIDs {
+				_, found := setBuildIDs[id]
+				if !found {
+					delete(commonBuildIDs, id)
+				}
+			}
 		}
 
 		firstTick = false

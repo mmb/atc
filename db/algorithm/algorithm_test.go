@@ -418,6 +418,45 @@ var _ = DescribeTable("Input resolving",
 	Entry("returns the first version that satisfies constraints when using every version", Example{
 		DB: DB{
 			BuildInputs: []DBRow{
+				{Job: CurrentJobName, BuildID: 1, Resource: "resource-x", Version: "rxv1", CheckOrder: 1},
+			},
+
+			BuildOutputs: []DBRow{
+				{Job: "simple-a", BuildID: 4, Resource: "resource-x", Version: "rxv1", CheckOrder: 1},
+				{Job: "simple-a", BuildID: 5, Resource: "resource-x", Version: "rxv2", CheckOrder: 2},
+				// no rxv3
+				// {Job: "simple-a", BuildID: 5, Resource: "resource-x", Version: "rxv3", CheckOrder: 3},
+				{Job: "simple-a", BuildID: 6, Resource: "resource-x", Version: "rxv4", CheckOrder: 4},
+			},
+
+			Resources: []DBRow{
+				{Resource: "resource-x", Version: "rxv1", CheckOrder: 1},
+				{Resource: "resource-x", Version: "rxv2", CheckOrder: 2},
+				{Resource: "resource-x", Version: "rxv3", CheckOrder: 3},
+				{Resource: "resource-x", Version: "rxv4", CheckOrder: 4},
+			},
+		},
+
+		Inputs: Inputs{
+			{
+				Name:     "resource-x",
+				Resource: "resource-x",
+				Version:  Version{Every: true},
+				Passed:   []string{"simple-a"},
+			},
+		},
+
+		Result: Result{
+			OK: true,
+			Values: map[string]string{
+				"resource-x": "rxv2",
+			},
+		},
+	}),
+
+	Entry("returns the first version that satisfies constraints when using every version", Example{
+		DB: DB{
+			BuildInputs: []DBRow{
 				{Job: CurrentJobName, BuildID: 1, Resource: "resource-x", Version: "rxv2", CheckOrder: 3},
 			},
 
@@ -765,6 +804,96 @@ var _ = DescribeTable("Input resolving",
 			{
 				Name:     "deployments",
 				Resource: "deployments",
+			},
+		},
+
+		Result: Result{
+			OK: true,
+			Values: map[string]string{
+				"candidate-release":    "imported-r238v448886",
+				"deployments":          "imported-r45v448469",
+				"bosh-stemcell":        "imported-r48v443997",
+				"bin-rc":               "imported-r765v448889",
+				"garden-linux-release": "imported-r17v443811",
+				"version":              "imported-r12v448884",
+				"concourse":            "imported-r62v448881",
+			},
+		},
+	}),
+
+	Entry("relint rc disabled stemcell high cpu regression test", Example{
+		LoadDB: "testdata/runtime-ci-versions-db.json",
+
+		Inputs: Inputs{
+			{
+				Name:     "runtime-ci",
+				Resource: "runtime-ci",
+			},
+			{
+				Name:     "diego-cf-compatibility",
+				Resource: "diego-cf-compatibility",
+			},
+			{
+				Name:     "cf-release",
+				Resource: "cf-release-develop",
+				Passed: []string{
+					"bosh-lite-acceptance-tests",
+					"a1-diego-cats",
+				},
+			},
+			{
+				Name:     "bosh-lite-stemcell",
+				Resource: "bosh-lite-stemcell",
+				Passed: []string{
+					"bosh-lite-acceptance-tests",
+				},
+			},
+			{
+				Name:     "stemcell",
+				Resource: "aws-stemcell",
+				Passed: []string{
+					"a1-diego-cats",
+				},
+			},
+			{
+				Name:     "diego-final-releases",
+				Resource: "diego-final-releases",
+				Passed: []string{
+					"a1-diego-cats",
+					"bosh-lite-acceptance-tests",
+				},
+			},
+			{
+				Name:     "diego-release-master",
+				Resource: "diego-release-master",
+				Passed: []string{
+					"a1-diego-cats",
+					"bosh-lite-acceptance-tests",
+				},
+			},
+			{
+				Name:     "garden-linux-release-tarball",
+				Resource: "garden-linux-release-tarball",
+				Passed: []string{
+					"a1-diego-cats",
+					"bosh-lite-acceptance-tests",
+				},
+			},
+			{
+				Name:     "etcd-release-tarball",
+				Resource: "etcd-release-tarball",
+				Passed: []string{
+					"a1-diego-cats",
+					"bosh-lite-acceptance-tests",
+				},
+			},
+			{
+				Name:     "cflinuxfs2-rootfs-release-tarball",
+				Resource: "cflinuxfs2-rootfs-release-tarball",
+				Passed: []string{
+					"a1-diego-cats",
+					"bosh-lite-acceptance-tests",
+				},
 			},
 		},
 
