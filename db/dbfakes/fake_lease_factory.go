@@ -9,26 +9,26 @@ import (
 )
 
 type FakeLeaseFactory struct {
-	NewLeaseStub        func(logger lager.Logger, lockID int) db.Lease
+	NewLeaseStub        func(logger lager.Logger, lockID int) db.Lock
 	newLeaseMutex       sync.RWMutex
 	newLeaseArgsForCall []struct {
 		logger lager.Logger
 		lockID int
 	}
 	newLeaseReturns struct {
-		result1 db.Lease
+		result1 db.Lock
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeLeaseFactory) NewLease(logger lager.Logger, lockID int) db.Lease {
+func (fake *FakeLeaseFactory) NewLock(logger lager.Logger, lockID int) db.Lock {
 	fake.newLeaseMutex.Lock()
 	fake.newLeaseArgsForCall = append(fake.newLeaseArgsForCall, struct {
 		logger lager.Logger
 		lockID int
 	}{logger, lockID})
-	fake.recordInvocation("NewLease", []interface{}{logger, lockID})
+	fake.recordInvocation("NewLock", []interface{}{logger, lockID})
 	fake.newLeaseMutex.Unlock()
 	if fake.NewLeaseStub != nil {
 		return fake.NewLeaseStub(logger, lockID)
@@ -49,10 +49,10 @@ func (fake *FakeLeaseFactory) NewLeaseArgsForCall(i int) (lager.Logger, int) {
 	return fake.newLeaseArgsForCall[i].logger, fake.newLeaseArgsForCall[i].lockID
 }
 
-func (fake *FakeLeaseFactory) NewLeaseReturns(result1 db.Lease) {
+func (fake *FakeLeaseFactory) NewLeaseReturns(result1 db.Lock) {
 	fake.NewLeaseStub = nil
 	fake.newLeaseReturns = struct {
-		result1 db.Lease
+		result1 db.Lock
 	}{result1}
 }
 
@@ -76,4 +76,4 @@ func (fake *FakeLeaseFactory) recordInvocation(key string, args []interface{}) {
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-var _ db.LeaseFactory = new(FakeLeaseFactory)
+var _ db.LockFactory = new(FakeLeaseFactory)

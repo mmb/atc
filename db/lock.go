@@ -7,26 +7,26 @@ import (
 	"github.com/jackc/pgx"
 )
 
-//go:generate counterfeiter . LeaseFactory
+//go:generate counterfeiter . LockFactory
 
-type LeaseFactory interface {
-	NewLease(logger lager.Logger, lockID int) Lease
+type LockFactory interface {
+	NewLock(logger lager.Logger, lockID int) Lock
 }
 
-type leaseFactory struct {
+type lockFactory struct {
 	conn  *pgx.Conn
 	locks lockRepo
 }
 
-func NewLeaseFactory(conn *pgx.Conn) LeaseFactory {
-	return &leaseFactory{
+func NewLockFactory(conn *pgx.Conn) LockFactory {
+	return &lockFactory{
 		conn:  conn,
 		locks: lockRepo{},
 	}
 }
 
-func (f *leaseFactory) NewLease(logger lager.Logger, lockID int) Lease {
-	return &lease{
+func (f *lockFactory) NewLock(logger lager.Logger, lockID int) Lock {
+	return &lock{
 		conn:   f.conn,
 		logger: logger,
 		lockID: lockID,
@@ -35,15 +35,15 @@ func (f *leaseFactory) NewLease(logger lager.Logger, lockID int) Lease {
 	}
 }
 
-//go:generate counterfeiter . Lease
+//go:generate counterfeiter . Lock
 
-type Lease interface {
-	AttemptSign() (bool, error)
-	Break() error
-	AfterBreak(func() error)
+type Lock interface {
+	Acquire() (bool, error)
+	Release() error
+	AfterRelease(func() error)
 }
 
-type lease struct {
+type lock struct {
 	conn   *pgx.Conn
 	logger lager.Logger
 
@@ -52,10 +52,10 @@ type lease struct {
 	lockID int
 	locks  lockRepo
 
-	afterBreak func() error
+	afterRelease func() error
 }
 
-func (l *lease) AttemptSign() (bool, error) {
+func (l *lock) Acquire() (bool, error) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -74,7 +74,7 @@ func (l *lease) AttemptSign() (bool, error) {
 	return signed, nil
 }
 
-func (l *lease) Break() error {
+func (l *lock) Release() error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -85,15 +85,15 @@ func (l *lease) Break() error {
 
 	l.locks.Unregister(l.lockID)
 
-	if l.afterBreak != nil {
-		return l.afterBreak()
+	if l.afterRelease != nil {
+		return l.afterRelease()
 	}
 
 	return nil
 }
 
-func (l *lease) AfterBreak(afterBreakFunc func() error) {
-	l.afterBreak = afterBreakFunc
+func (l *lock) AfterRelease(afterReleaseFunc func() error) {
+	l.afterRelease = afterReleaseFunc
 }
 
 type lockRepo map[int]bool
