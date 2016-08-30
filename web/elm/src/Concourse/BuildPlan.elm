@@ -5,7 +5,7 @@ import Http
 import Task exposing (Task)
 import Json.Decode exposing ((:=))
 
-import Concourse.Version exposing (Version)
+import Concourse
 
 type alias BuildPlan =
   { id : String
@@ -17,7 +17,7 @@ type alias StepName =
 
 type BuildStep
   = Task StepName
-  | Get StepName (Maybe Version)
+  | Get StepName (Maybe Concourse.Version)
   | Put StepName
   | DependentGet StepName
   | Aggregate (Array BuildPlan)
@@ -50,6 +50,7 @@ decodePlan : Json.Decode.Decoder BuildPlan
 decodePlan =
   Json.Decode.object2 BuildPlan ("id" := Json.Decode.string) <|
     Json.Decode.oneOf
+      -- buckle up
       [ "task" := lazy (\_ -> decodeTask)
       , "get" := lazy (\_ -> decodeGet)
       , "put" := lazy (\_ -> decodePut)
@@ -73,7 +74,7 @@ decodeGet =
   Json.Decode.object2 Get
     ("name" := Json.Decode.string)
     (Json.Decode.maybe <|
-      "version" := Concourse.Version.decode)
+      "version" := Concourse.decodeVersion)
 
 decodePut : Json.Decode.Decoder BuildStep
 decodePut =

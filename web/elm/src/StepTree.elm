@@ -24,7 +24,7 @@ import Html.Events exposing (onClick, onMouseDown)
 import Html.Attributes exposing (class, classList)
 
 import Concourse.BuildPlan exposing (BuildPlan)
-import Concourse.BuildResources exposing (BuildResources)
+import Concourse
 import DictView
 
 type StepTree
@@ -95,7 +95,7 @@ type alias MetadataField =
   , value : String
   }
 
-init : BuildResources -> BuildPlan -> Model
+init : Concourse.BuildResources -> BuildPlan -> Model
 init resources plan =
   case plan.step of
     Concourse.BuildPlan.Task name ->
@@ -198,14 +198,14 @@ treeIsActive tree =
 stepIsActive : Step -> Bool
 stepIsActive = isActive << .state
 
-setupGetStep : BuildResources -> StepName -> Maybe Version -> Step -> Step
+setupGetStep : Concourse.BuildResources -> StepName -> Maybe Version -> Step -> Step
 setupGetStep resources name version step =
   { step
   | version = version
   , firstOccurrence = isFirstOccurrence resources.inputs name
   }
 
-isFirstOccurrence : List Concourse.BuildResources.BuildInput -> StepName -> Bool
+isFirstOccurrence : List Concourse.BuildResourcesInput -> StepName -> Bool
 isFirstOccurrence resources step =
   case resources of
     [] ->
@@ -291,7 +291,7 @@ initBottom create id name =
     , finished = False
     }
 
-initWrappedStep : BuildResources -> (StepTree -> StepTree) -> BuildPlan -> Model
+initWrappedStep : Concourse.BuildResources -> (StepTree -> StepTree) -> BuildPlan -> Model
 initWrappedStep resources create plan =
   let
     {tree, foci} = init resources plan
@@ -301,7 +301,7 @@ initWrappedStep resources create plan =
     , finished = False
     }
 
-initHookedStep : BuildResources -> (HookedStep -> StepTree) -> Concourse.BuildPlan.HookedPlan -> Model
+initHookedStep : Concourse.BuildResources -> (HookedStep -> StepTree) -> Concourse.BuildPlan.HookedPlan -> Model
 initHookedStep resources create hookedPlan =
   let
     stepModel = init resources hookedPlan.step

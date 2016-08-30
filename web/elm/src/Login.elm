@@ -11,7 +11,8 @@ import String
 import Task
 
 import Concourse.AuthMethod exposing (AuthMethod (..))
-import Concourse.Team exposing (Team)
+import Concourse
+import Concourse.Team
 
 type alias PageWithRedirect =
   { page : Page
@@ -26,7 +27,7 @@ type Model
 
 type alias TeamSelectionModel =
   { teamFilter : String
-  , teams : Maybe (List Team)
+  , teams : Maybe (List Concourse.Team)
   , redirect : String
   }
 
@@ -40,7 +41,7 @@ type alias LoginModel =
 type Msg
   = Noop
   | FilterTeams String
-  | TeamsFetched (Result Http.Error (List Team))
+  | TeamsFetched (Result Http.Error (List Concourse.Team))
   | SelectTeam String
   | AuthFetched (Result Http.Error (List AuthMethod))
   | GoBack
@@ -266,7 +267,7 @@ assertLeftButton message button =
   if button == 0 then Ok message
   else Err "placeholder error, nothing is wrong"
 
-viewTeam : String -> Team -> Html Msg
+viewTeam : String -> Concourse.Team -> Html Msg
 viewTeam redirect team =
   Html.a
     [ onClickPreventDefault <| SelectTeam team.name
@@ -274,7 +275,7 @@ viewTeam redirect team =
     ]
     [ Html.text <| team.name ]
 
-filterTeams : String -> List Team -> List Team
+filterTeams : String -> List Concourse.Team -> List Concourse.Team
 filterTeams teamFilter teams =
   let
     filteredList =
@@ -289,17 +290,17 @@ filterTeams teamFilter teams =
   in
     caseSensitive ++ notCaseSensitive ++ notStartingTeams
 
-teamNameContains : String -> Team -> Bool
+teamNameContains : String -> Concourse.Team -> Bool
 teamNameContains substring team =
   String.contains substring <|
     String.toLower team.name
 
-teamNameStartsWith : String -> Team -> Bool
+teamNameStartsWith : String -> Concourse.Team -> Bool
 teamNameStartsWith substring team =
   String.startsWith substring <|
     String.toLower team.name
 
-teamNameStartsWithSensitive : String -> Team -> Bool
+teamNameStartsWithSensitive : String -> Concourse.Team -> Bool
 teamNameStartsWithSensitive substring team =
   String.startsWith substring team.name
 
