@@ -1,8 +1,19 @@
 {{define "title"}}History - Concourse{{end}}
 
 {{define "body"}}
+<div id="elm-app"></div>
+
+<script type="text/javascript">
+var node = document.getElementById("elm-app");
+Elm.ResourcePage.embed(node, {
+  teamName: {{.TeamName}},
+  pipelineName: {{.PipelineName}},
+  resourceName: {{.Resource.Name}},
+});
+</script>
+
 <div class="with-fixed-header">
-  <div class="fixed-header">
+  <!-- <div class="fixed-header">
     <div class="pagination-header">
       <div class="pagination fr">
         {{if .Pagination.Previous}}
@@ -27,9 +38,9 @@
 
       <h1 class="h1">{{.Resource.Name}}</h1>
     </div>
-  </div>
+  </div> -->
 
-  <div class="scrollable-body">
+  <!-- <div class="scrollable-body">
     <div class="js-resource" data-teamname="{{.TeamName}}" data-endpoint="/api/v1/teams/{{.TeamName}}/pipelines/{{.PipelineName}}/resources/{{.Resource.Name}}">
       <div class="resource-check-status">
         <div class="build-step">
@@ -112,7 +123,7 @@
       {{end}}
     </ul>
   </div>
-</div>
+</div> -->
 
 <script src="{{asset "resources.js"}}"></script>
 {{end}}
