@@ -41,7 +41,8 @@ type TemplateData struct {
 	PipelineName string
 	TeamName     string
 
-	Pagination concourse.Pagination
+	Since int
+	Until int
 }
 
 var ErrConfigNotFound = errors.New("could not find config")
@@ -71,7 +72,7 @@ func FetchTemplateData(
 		return TemplateData{}, ErrResourceNotFound
 	}
 
-	versionedResources, pagination, resourceVersionsFound, err := team.ResourceVersions(pipelineName, resourceName, page)
+	versionedResources, _, resourceVersionsFound, err := team.ResourceVersions(pipelineName, resourceName, page)
 	if err != nil {
 		return TemplateData{}, err
 	}
@@ -123,7 +124,8 @@ func FetchTemplateData(
 		Versions:     versions,
 		PipelineName: pipelineName,
 		TeamName:     team.Name(),
-		Pagination:   pagination,
+		Since:        page.Since,
+		Until:        page.Until,
 		GroupStates: group.States(pipeline.Groups, func(g atc.GroupConfig) bool {
 			for _, groupResource := range g.Resources {
 				if groupResource == resource.Name {

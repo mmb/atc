@@ -5,9 +5,12 @@ module Concourse.Resource exposing
   , fetchVersionedResources
   , enableVersionedResource
   , disableVersionedResource
+  , fetchInputTo
+  , fetchOutputOf
   )
 
 import Concourse
+import Concourse.Pagination exposing (Pagination, Paginated, Page)
 import Http
 import Json.Decode
 import Task exposing (Task)
@@ -44,10 +47,12 @@ pauseUnpause pause rid =
   in
     Task.mapError promoteHttpError put `Task.andThen` handleResponse
 
-fetchVersionedResources : Concourse.ResourceIdentifier -> Task Http.Error (List Concourse.VersionedResource)
-fetchVersionedResources rid =
-  Http.get (Json.Decode.list Concourse.decodeVersionedResource) <|
-    "/api/v1/teams/" ++ rid.teamName ++ "/pipelines/" ++ rid.pipelineName ++ "/resources/" ++ rid.resourceName ++ "/versions"
+fetchVersionedResources : Concourse.ResourceIdentifier -> Maybe Page -> Task Http.Error (Paginated Concourse.VersionedResource)
+fetchVersionedResources rid page =
+  let
+    url = "/api/v1/teams/" ++ rid.teamName ++ "/pipelines/" ++ rid.pipelineName ++ "/resources/" ++ rid.resourceName ++ "/versions"
+  in
+    Concourse.Pagination.fetch Concourse.decodeVersionedResource url page
 
 enableVersionedResource : Concourse.VersionedResourceIdentifier -> Task Http.Error ()
 enableVersionedResource =
@@ -64,7 +69,7 @@ enableDisableVersionedResource enable vrid =
       if enable
         then  "enable"
         else  "disable"
-  in let
+
     put =
       Http.send Http.defaultSettings
         { verb = "PUT"
@@ -87,3 +92,17 @@ promoteHttpError rawError =
   case rawError of
     Http.RawTimeout -> Http.Timeout
     Http.RawNetworkError -> Http.NetworkError
+
+
+fetchInputTo : Concourse.VersionedResourceIdentifier -> Task Http.Error (List Concourse.Build)
+fetchInputTo =
+  fetchInputOutput "input_to"
+
+fetchOutputOf : Concourse.VersionedResourceIdentifier -> Task Http.Error (List Concourse.Build)
+fetchOutputOf =
+  fetchInputOutput "output_of"
+
+fetchInputOutput : String -> Concourse.VersionedResourceIdentifier -> Task Http.Error (List Concourse.Build)
+fetchInputOutput action vrid =
+  Http.get (Json.Decode.list Concourse.decodeBuild) <|
+    "/api/v1/teams/" ++ vrid.teamName ++ "/pipelines/" ++ vrid.pipelineName ++ "/resources/" ++ vrid.resourceName ++ "/versions/" ++ toString vrid.versionID ++ "/" ++ action
