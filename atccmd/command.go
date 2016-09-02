@@ -144,23 +144,25 @@ func (cmd *ATCCommand) Runner(args []string) (ifrit.Runner, error) {
 	}
 
 	lockConn, err := cmd.constructLockConn()
+	logConn := db.Log(logger.Session("log-conn"), dbConn)
+
 	if err != nil {
 		return nil, err
 	}
 	lockFactory := db.NewLockFactory(lockConn)
 
 	listener := pq.NewListener(cmd.PostgresDataSource, time.Second, time.Minute, nil)
-	bus := db.NewNotificationsBus(listener, dbConn)
+	bus := db.NewNotificationsBus(listener, logConn)
 
-	sqlDB := db.NewSQL(dbConn, bus, lockFactory)
+	sqlDB := db.NewSQL(logConn, bus, lockFactory)
 	trackerFactory := resource.NewTrackerFactory()
 	resourceFetcherFactory := resource.NewFetcherFactory(sqlDB, clock.NewClock())
-	pipelineDBFactory := db.NewPipelineDBFactory(dbConn, bus, lockFactory)
+	pipelineDBFactory := db.NewPipelineDBFactory(logConn, bus, lockFactory)
 	workerClient := cmd.constructWorkerPool(logger, sqlDB, trackerFactory, resourceFetcherFactory, pipelineDBFactory)
 
 	tracker := trackerFactory.TrackerFor(workerClient)
 	resourceFetcher := resourceFetcherFactory.FetcherFor(workerClient)
-	teamDBFactory := db.NewTeamDBFactory(dbConn, bus, lockFactory)
+	teamDBFactory := db.NewTeamDBFactory(logConn, bus, lockFactory)
 	engine := cmd.constructEngine(workerClient, tracker, resourceFetcher, teamDBFactory)
 
 	radarSchedulerFactory := pipelines.NewRadarSchedulerFactory(
