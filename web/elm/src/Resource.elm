@@ -41,6 +41,7 @@ type PauseChangingOrErrored
 
 type Msg
   = Noop
+  | AutoupdateTimerTicked Time (List (Cmd Msg))
   | ResourceFetched (Result Http.Error Concourse.Resource)
   | TogglePaused
   | PausedToggled (Result Http.Error ())
@@ -84,9 +85,9 @@ init flags =
       }
   in
     ( model
-    , Cmd.batch
-        [ fetchResource 0 model.resourceIdentifier
-        , fetchVersionedResources 0 model.resourceIdentifier model.currentPage
+    , autoupdateTicked (5 * Time.second)
+        [ fetchResource model.resourceIdentifier
+        , fetchVersionedResources model.resourceIdentifier model.currentPage
         ]
     )
 
@@ -95,9 +96,13 @@ update action model =
   case action of
     Noop ->
       (model, Cmd.none)
+    AutoupdateTimerTicked interval updates ->
+      ( model
+      , autoupdateTicked interval updates
+      )
     ResourceFetched (Ok resource) ->
       ( { model | resource = Just resource }
-      , fetchResource (5 * Time.second) model.resourceIdentifier
+      , fetchResource model.resourceIdentifier
       )
     ResourceFetched (Err err) ->
       Debug.log ("failed to fetch resource: " ++ toString err) <|
@@ -129,37 +134,32 @@ update action model =
             }
           , Cmd.none
           )
-    VersionedResourcesFetched page (Ok paginated) ->
-      case model.currentPage of
-        Nothing ->
-          let
-            fetchedPage =
-              Just <| permalink paginated.content
-          in
-            ( { model
-              | versionedResources = paginated
-              , currentPage = fetchedPage
-              }
-            , fetchVersionedResources (5 * Time.second) model.resourceIdentifier fetchedPage
+    VersionedResourcesFetched requestedPage (Ok paginated) ->
+      let
+        fetchedPage =
+          permalink paginated.content
+        newModel =
+          { model
+          | versionedResources = paginated
+          , currentPage = Just fetchedPage
+          }
+        chosenModel =
+          case model.currentPage of
+              Nothing ->
+                newModel
+              Just page ->
+                if Concourse.Pagination.equal page fetchedPage then
+                  newModel
+                else
+                  model
+      in
+        case requestedPage of
+          Nothing ->
+            (model, Cmd.none)
+          Just somePage ->
+            ( chosenModel
+            , Cmd.none
             )
-        Just cp ->
-          case page of
-            Nothing ->
-              (model, Cmd.none)
-            Just fetchedPage ->
-              if Concourse.Pagination.equal cp fetchedPage then
-                let
-                  temp =
-                    Just <| permalink paginated.content
-                in
-                ( { model
-                  | versionedResources = paginated
-                  , currentPage = temp
-                  }
-                , fetchVersionedResources (5 * Time.second) model.resourceIdentifier temp
-                )
-              else
-                (model, Cmd.none)
 
     VersionedResourcesFetched _ (Err err) ->
       Debug.log ("failed to fetch versioned resources: " ++ toString err) <|
@@ -169,7 +169,7 @@ update action model =
         | currentPage = Just page
         }
       , Cmd.batch
-        [ fetchVersionedResources 0 model.resourceIdentifier <| Just page
+        [ fetchVersionedResources model.resourceIdentifier <| Just page
         , Navigation.newUrl <| paginationRoute model.resourceIdentifier page
         ]
       )
@@ -249,7 +249,7 @@ update action model =
           getState versionID model.versionedUIStates
         newState =
           { oldState
-            | expanded = not oldState.expanded
+          | expanded = not oldState.expanded
           }
       in
         ( { model
@@ -298,7 +298,7 @@ update action model =
         ( { model
           | versionedUIStates = setState versionID newState model.versionedUIStates
           }
-        , Cmd.none
+        , Cmd.none -- actually, loop again if still open and still on the current page
         )
 
 permalink : List Concourse.VersionedResource -> Page
@@ -386,12 +386,12 @@ view model =
               [ Html.div [class "pagination-header"]
                   [ Html.div [class "pagination fr"]
                       [ Html.div [class previousButtonClass, onClick previousButtonEvent]
-                          [ Html.span [class "arrow"]
+                          [ Html.a [class "arrow"]
                               [ Html.i [class "fa fa-arrow-left"] []
                               ]
                           ]
                       , Html.div [class nextButtonClass, onClick nextButtonEvent]
-                          [ Html.span [class "arrow"]
+                          [ Html.a [class "arrow"]
                               [ Html.i [class "fa fa-arrow-right"] []
                               ]
                           ]
@@ -597,10 +597,25 @@ viewBuildsByJob buildDict jobName =
       )
     ]
 
-fetchResource : Time -> Concourse.ResourceIdentifier -> Cmd Msg
-fetchResource delay resourceIdentifier =
+autoupdateTicked : Time -> List (Cmd Msg) -> Cmd Msg
+autoupdateTicked interval updates =
+  Cmd.batch <|
+    List.append updates
+      [ Task.perform neverOp (scheduleNextTick interval updates) <| Process.sleep interval
+      ]
+
+neverOp : x -> Msg
+neverOp anything =
+  Noop
+
+scheduleNextTick : Time -> List (Cmd Msg) -> () -> Msg
+scheduleNextTick interval updates _ =
+  AutoupdateTimerTicked interval updates
+
+fetchResource : Concourse.ResourceIdentifier -> Cmd Msg
+fetchResource resourceIdentifier =
   Cmd.map ResourceFetched << Task.perform Err Ok <|
-    Process.sleep delay `Task.andThen` (always <| Concourse.Resource.fetchResource resourceIdentifier)
+    Concourse.Resource.fetchResource resourceIdentifier
 
 pauseResource : Concourse.ResourceIdentifier -> Cmd Msg
 pauseResource resourceIdentifier =
@@ -612,10 +627,10 @@ unpauseResource resourceIdentifier =
   Cmd.map PausedToggled << Task.perform Err Ok <|
     Concourse.Resource.unpause resourceIdentifier
 
-fetchVersionedResources : Time -> Concourse.ResourceIdentifier -> Maybe Page -> Cmd Msg
-fetchVersionedResources delay resourceIdentifier page =
+fetchVersionedResources : Concourse.ResourceIdentifier -> Maybe Page -> Cmd Msg
+fetchVersionedResources resourceIdentifier page =
   Cmd.map (VersionedResourcesFetched page) << Task.perform Err Ok <|
-    Process.sleep delay `Task.andThen` (always <| Concourse.Resource.fetchVersionedResources resourceIdentifier page)
+    Concourse.Resource.fetchVersionedResources resourceIdentifier page
 
 enableVersionedResource : Concourse.VersionedResourceIdentifier -> Cmd Msg
 enableVersionedResource versionedResourceIdentifier =
