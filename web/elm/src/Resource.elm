@@ -500,7 +500,7 @@ viewVersionedResource states versionedResource =
                 [ [ Html.div [class "list-collapsable-title"] [Html.text "outputs of"]]
                 , viewBuilds <| listToMap resourceState.outputOf
                 ]
-        , Html.div [class "vri"]
+        , Html.div [class "vri metadata-container"]
             [ Html.div [class "list-collapsable-title"] [Html.text "metadata"]
             , viewMetadata versionedResource.metadata
             ]
@@ -554,7 +554,7 @@ listToMap builds =
           jobName =
             case build.job of
               Nothing ->
-                "" -- these builds alaways have job
+                Debug.crash "Jobless builds shouldn't appear on this page!" ""
               Just job ->
                 job.jobName
 
