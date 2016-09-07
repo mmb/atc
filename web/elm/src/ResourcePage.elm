@@ -10,5 +10,5 @@ main =
     { init = Resource.init
     , update = Resource.update
     , view = Resource.view
-    , subscriptions = always Sub.none
+    , subscriptions = Resource.autoupdateTimer
   }

@@ -1,4 +1,4 @@
-module Resource exposing (Flags, init, update, view)
+module Resource exposing (Flags, init, update, view, autoupdateTimer)
 
 import Concourse
 import Concourse.BuildStatus
@@ -13,7 +13,6 @@ import Html.Attributes.Aria exposing (ariaLabel)
 import Html.Events exposing (onClick)
 import Http
 import Navigation
-import Process
 import Task exposing (Task)
 import Time exposing (Time)
 import Redirect
@@ -41,7 +40,7 @@ type PauseChangingOrErrored
 
 type Msg
   = Noop
-  | AutoupdateTimerTicked Time (List (Cmd Msg))
+  | AutoupdateTimerTicked Time
   | ResourceFetched (Result Http.Error Concourse.Resource)
   | TogglePaused
   | PausedToggled (Result Http.Error ())
@@ -85,7 +84,7 @@ init flags =
       }
   in
     ( model
-    , autoupdateTicked (5 * Time.second)
+    , Cmd.batch
         [ fetchResource model.resourceIdentifier
         , fetchVersionedResources model.resourceIdentifier model.currentPage
         ]
@@ -96,13 +95,16 @@ update action model =
   case action of
     Noop ->
       (model, Cmd.none)
-    AutoupdateTimerTicked interval updates ->
+    AutoupdateTimerTicked timestamp ->
       ( model
-      , autoupdateTicked interval updates
+      , Cmd.batch
+          [ fetchResource model.resourceIdentifier
+          , fetchVersionedResources model.resourceIdentifier model.currentPage
+          ]
       )
     ResourceFetched (Ok resource) ->
       ( { model | resource = Just resource }
-      , fetchResource model.resourceIdentifier
+      , Cmd.none
       )
     ResourceFetched (Err err) ->
       Debug.log ("failed to fetch resource: " ++ toString err) <|
@@ -139,25 +141,27 @@ update action model =
         fetchedPage =
           permalink paginated.content
         newModel =
-          { model
-          | versionedResources = paginated
-          , currentPage = Just fetchedPage
-          }
-        chosenModel =
-          case model.currentPage of
+          \newPage ->
+            { model
+            | versionedResources = paginated
+            , currentPage = newPage
+            }
+        chosenModelWith =
+          \requestedPageUnwrapped ->
+            case model.currentPage of
               Nothing ->
-                newModel
+                newModel <| Just fetchedPage
               Just page ->
-                if Concourse.Pagination.equal page fetchedPage then
-                  newModel
+                if Concourse.Pagination.equal page requestedPageUnwrapped then
+                  newModel <| requestedPage
                 else
                   model
       in
         case requestedPage of
           Nothing ->
-            (model, Cmd.none)
-          Just somePage ->
-            ( chosenModel
+            (newModel (Just fetchedPage), Cmd.none)
+          Just requestedPageUnwrapped ->
+            ( chosenModelWith requestedPageUnwrapped
             , Cmd.none
             )
 
@@ -298,7 +302,7 @@ update action model =
         ( { model
           | versionedUIStates = setState versionID newState model.versionedUIStates
           }
-        , Cmd.none -- actually, loop again if still open and still on the current page
+        , Cmd.none
         )
 
 permalink : List Concourse.VersionedResource -> Page
@@ -597,20 +601,9 @@ viewBuildsByJob buildDict jobName =
       )
     ]
 
-autoupdateTicked : Time -> List (Cmd Msg) -> Cmd Msg
-autoupdateTicked interval updates =
-  Cmd.batch <|
-    List.append updates
-      [ Task.perform neverOp (scheduleNextTick interval updates) <| Process.sleep interval
-      ]
-
-neverOp : x -> Msg
-neverOp anything =
-  Noop
-
-scheduleNextTick : Time -> List (Cmd Msg) -> () -> Msg
-scheduleNextTick interval updates _ =
-  AutoupdateTimerTicked interval updates
+autoupdateTimer : Model -> Sub Msg
+autoupdateTimer model =
+  Time.every (5 * Time.second) AutoupdateTimerTicked
 
 fetchResource : Concourse.ResourceIdentifier -> Cmd Msg
 fetchResource resourceIdentifier =
