@@ -27,15 +27,8 @@ func NewHandler(logger lager.Logger, clientFactory web.ClientFactory, template *
 	}
 }
 
-type VersionedResourceWithInputsAndOutputs struct {
-	VersionedResource atc.VersionedResource
-	InputsTo          map[string][]atc.Build
-	OutputsOf         map[string][]atc.Build
-}
-
 type TemplateData struct {
 	Resource atc.Resource
-	Versions []VersionedResourceWithInputsAndOutputs
 
 	GroupStates  []group.State
 	PipelineName string
@@ -72,56 +65,8 @@ func FetchTemplateData(
 		return TemplateData{}, ErrResourceNotFound
 	}
 
-	versionedResources, _, resourceVersionsFound, err := team.ResourceVersions(pipelineName, resourceName, page)
-	if err != nil {
-		return TemplateData{}, err
-	}
-
-	if !resourceVersionsFound {
-		return TemplateData{}, ErrResourceNotFound
-	}
-
-	versions := []VersionedResourceWithInputsAndOutputs{}
-	for _, versionedResource := range versionedResources {
-		inputs, _, err := team.BuildsWithVersionAsInput(pipelineName, resourceName, versionedResource.ID)
-		if err != nil {
-			return TemplateData{}, err
-		}
-
-		outputs, _, err := team.BuildsWithVersionAsOutput(pipelineName, resourceName, versionedResource.ID)
-		if err != nil {
-			return TemplateData{}, err
-		}
-
-		inputsTo := map[string][]atc.Build{}
-		outputsOf := map[string][]atc.Build{}
-
-		for _, input := range inputs {
-			if _, ok := inputsTo[input.JobName]; !ok {
-				inputsTo[input.JobName] = []atc.Build{}
-			}
-
-			inputsTo[input.JobName] = append(inputsTo[input.JobName], input)
-		}
-
-		for _, output := range outputs {
-			if _, ok := outputsOf[output.JobName]; !ok {
-				outputsOf[output.JobName] = []atc.Build{}
-			}
-
-			outputsOf[output.JobName] = append(outputsOf[output.JobName], output)
-		}
-
-		versions = append(versions, VersionedResourceWithInputsAndOutputs{
-			VersionedResource: versionedResource,
-			InputsTo:          inputsTo,
-			OutputsOf:         outputsOf,
-		})
-	}
-
 	return TemplateData{
 		Resource:     resource,
-		Versions:     versions,
 		PipelineName: pipelineName,
 		TeamName:     team.Name(),
 		Since:        page.Since,
