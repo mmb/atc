@@ -404,27 +404,27 @@ view model =
                       ]
                   , Html.h1 [] [Html.text resource.name]
                   ]
-              , Html.div [class "scrollable-body"]
-                  [ Html.div [class "resource-check-status"]
-                      [ Html.div [class "build-step"]
-                          ( List.append
-                              [ Html.div [class "header"]
-                                  [ Html.span
-                                      [ class <| "btn-pause fl " ++ paused
-                                      , ariaLabel aria
-                                      , onClick onClickEvent
-                                      ]
-                                      [ Html.i [class <| "fa fa-fw " ++ pausedIcon] []
-                                      ]
-                                  , Html.h3 [] [Html.text checkMessage]
-                                  , Html.i [class <| checkStatus] []
+              ]
+          , Html.div [class "scrollable-body"]
+              [ Html.div [class "resource-check-status"]
+                  [ Html.div [class "build-step"]
+                      ( List.append
+                          [ Html.div [class "header"]
+                              [ Html.span
+                                  [ class <| "btn-pause fl " ++ paused
+                                  , ariaLabel aria
+                                  , onClick onClickEvent
                                   ]
+                                  [ Html.i [class <| "fa fa-fw " ++ pausedIcon] []
+                                  ]
+                              , Html.h3 [] [Html.text checkMessage]
+                              , Html.i [class <| checkStatus] []
                               ]
-                              stepBody
-                          )
-                      ]
-                  , ( viewVersionedResources model.versionedResources.content model.versionedUIStates)
+                          ]
+                          stepBody
+                      )
                   ]
+              , ( viewVersionedResources model.versionedResources.content model.versionedUIStates)
               ]
           ]
     Nothing ->
