@@ -97,11 +97,11 @@ update action model =
       (model, Cmd.none)
     AutoupdateTimerTicked timestamp ->
       ( model
-      , Cmd.batch
-          List.concat
+      , Cmd.batch <|
+          List.append
             [ fetchResource model.resourceIdentifier
             , fetchVersionedResources model.resourceIdentifier model.currentPage
-            ]
+            ] <|
             updateExpandedProperties model
       )
     ResourceFetched (Ok resource) ->
@@ -605,25 +605,41 @@ viewBuildsByJob buildDict jobName =
 
 updateExpandedProperties : Model -> List (Cmd Msg)
 updateExpandedProperties model =
-  -- we have access to:
-     -- model.versionedResources      List (Concourse.VersionedResource)
-        -- versionedResource.id       Int -----.
-     -- model.versionedUIStates       Dict of Int to VersionedUIState
-        -- VersionedUIState.expanded  Bool
-  --want to create a Cmd that:
-      -- fetches inputs and outputs for every expanded versionedResource
-  --methods you might use:
-    -- List.map or maybe List.concatMap
-    -- List.filter
-    -- you will probably have to define a few "helper functions" either inline like we did before or like you see below
-let
+  let
+    filteredList =
+      List.filter
+        (isExpanded model.versionedUIStates)
+        model.versionedResources.content
+  in
+    List.concatMap
+      (fetchInputAndOutputs model)
+      filteredList
 
-in
+isExpanded : Dict.Dict Int VersionUIState -> Concourse.VersionedResource -> Bool
+isExpanded states versionedResource =
+  let
+    state =
+      Dict.get versionedResource.id states
+  in
+    case state of
+      Nothing ->
+        False
+      Just someState ->
+        someState.expanded
 
--- we can add a parameter to this method, and "lock it in" with a value later
--- hint: the new parameter MUST be the first parameter
--- if you're stuck, consider reading about "currying" functions
-ourCondition : Concourse.VersionedResource -> Bool
+fetchInputAndOutputs : Model -> Concourse.VersionedResource -> List (Cmd Msg)
+fetchInputAndOutputs model versionedResource =
+  let
+    identifier =
+      { teamName = model.resourceIdentifier.teamName
+      , pipelineName = model.resourceIdentifier.pipelineName
+      , resourceName = model.resourceIdentifier.resourceName
+      , versionID = versionedResource.id
+      }
+  in
+    [ fetchInputTo identifier
+    , fetchOutputOf identifier
+    ]
 
 autoupdateTimer : Model -> Sub Msg
 autoupdateTimer model =
