@@ -2,7 +2,6 @@ package algorithm
 
 import (
 	"fmt"
-	"log"
 	"strings"
 )
 
@@ -43,7 +42,7 @@ func (candidates InputCandidates) String() string {
 }
 
 func (candidates InputCandidates) Reduce(jobs JobSet) (ResolvedInputs, bool) {
-	return candidates.reduce(jobs, nil)
+	return candidates.reduce(jobs)
 }
 
 func (candidates InputCandidates) Pin(input int, version int) {
@@ -72,12 +71,11 @@ func shouldRunNext(
 	}
 
 	next, hasNext := versionIDs.Peek()
-	log.Println("NEXT", next, hasNext)
 	return !hasNext ||
 		inputVersionCandidates.ExistingBuildResolver.ExistsForVersion(next)
 }
 
-func (candidates InputCandidates) reduce(jobs JobSet, lastResolved ResolvedInputs) (ResolvedInputs, bool) {
+func (candidates InputCandidates) reduce(jobs JobSet) (ResolvedInputs, bool) {
 	newInputCandidates := candidates.pruneToCommonBuilds(jobs)
 
 	for i, inputVersionCandidates := range newInputCandidates {
@@ -101,18 +99,12 @@ func (candidates InputCandidates) reduce(jobs JobSet, lastResolved ResolvedInput
 
 			newInputCandidates.Pin(i, id)
 
-			mapping, ok := newInputCandidates.reduce(jobs, lastResolved)
+			mapping, ok := newInputCandidates.reduce(jobs)
 			if ok {
-				// TODO weird shadowing here?
-				// lastSatisfiedMapping = mapping
 				if shouldRunNext(id, versionIDs, inputVersionCandidates) {
 					return mapping, true
 				}
-			} // else {
-			// if lastResolved != nil {
-			// 	return lastResolved, true
-			// }
-			// }
+			}
 
 			newInputCandidates.Unpin(i, inputVersionCandidates)
 		}

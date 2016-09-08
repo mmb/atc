@@ -6,7 +6,6 @@ import (
 
 	"code.cloudfoundry.org/lager/lagertest"
 	"github.com/concourse/atc"
-	"github.com/concourse/atc/db"
 	"github.com/concourse/atc/db/algorithm"
 	dbfakes "github.com/concourse/atc/db/dbfakes"
 	. "github.com/concourse/atc/scheduler"
@@ -24,7 +23,7 @@ var _ = Describe("Runner", func() {
 		scheduler  *schedulerfakes.FakeBuildScheduler
 		noop       bool
 
-		lease *dbfakes.FakeLease
+		lock *dbfakes.FakeLease
 
 		initialConfig atc.Config
 
@@ -85,11 +84,11 @@ var _ = Describe("Runner", func() {
 				},
 			},
 		}
+		pipelineDB.ReloadReturns(true, nil)
+		pipelineDB.ConfigReturns(initialConfig)
 
-		pipelineDB.GetConfigReturns(initialConfig, 1, true, nil)
-
-		lease = new(dbfakes.FakeLease)
-		pipelineDB.LeaseSchedulingReturns(lease, true, nil)
+		lock = new(dbfakes.FakeLease)
+		pipelineDB.AcquireSchedulingLockReturns(lock, true, nil)
 	})
 
 	JustBeforeEach(func() {
@@ -106,32 +105,32 @@ var _ = Describe("Runner", func() {
 		ginkgomon.Interrupt(process)
 	})
 
-	It("signs the scheduling lease for the pipeline", func() {
-		Eventually(pipelineDB.LeaseSchedulingCallCount).Should(BeNumerically(">=", 1))
+	It("signs the scheduling lock for the pipeline", func() {
+		Eventually(pipelineDB.AcquireSchedulingLockCallCount).Should(BeNumerically(">=", 1))
 
-		_, duration := pipelineDB.LeaseSchedulingArgsForCall(0)
+		_, duration := pipelineDB.AcquireSchedulingLockArgsForCall(0)
 		Expect(duration).To(Equal(100 * time.Millisecond))
 	})
 
-	Context("when it can't get the lease", func() {
+	Context("when it can't get the lock", func() {
 		BeforeEach(func() {
-			pipelineDB.LeaseSchedulingReturns(nil, false, nil)
+			pipelineDB.AcquireSchedulingLockReturns(nil, false, nil)
 		})
 
 		It("does not do any scheduling", func() {
-			Eventually(pipelineDB.LeaseSchedulingCallCount).Should(Equal(2))
+			Eventually(pipelineDB.AcquireSchedulingLockCallCount).Should(Equal(2))
 
 			Expect(scheduler.ScheduleCallCount()).To(BeZero())
 		})
 	})
 
-	Context("when getting the lease blows up", func() {
+	Context("when getting the lock blows up", func() {
 		BeforeEach(func() {
-			pipelineDB.LeaseSchedulingReturns(nil, false, errors.New(":3"))
+			pipelineDB.AcquireSchedulingLockReturns(nil, false, errors.New(":3"))
 		})
 
 		It("does not do any scheduling", func() {
-			Eventually(pipelineDB.LeaseSchedulingCallCount).Should(Equal(2))
+			Eventually(pipelineDB.AcquireSchedulingLockCallCount).Should(Equal(2))
 
 			Expect(scheduler.ScheduleCallCount()).To(BeZero())
 		})
@@ -140,15 +139,12 @@ var _ = Describe("Runner", func() {
 	It("schedules pending builds", func() {
 		Eventually(scheduler.ScheduleCallCount).Should(Equal(2))
 
-		_, versions, job, resources, resourceTypes := scheduler.ScheduleArgsForCall(0)
+		_, versions, jobs, resources, resourceTypes := scheduler.ScheduleArgsForCall(0)
 		Expect(versions).To(Equal(someVersions))
-		Expect(job).To(Equal(atc.JobConfig{Name: "some-job"}))
-		Expect(resources).To(Equal(initialConfig.Resources))
-		Expect(resourceTypes).To(Equal(initialConfig.ResourceTypes))
-
-		_, versions, job, resources, resourceTypes = scheduler.ScheduleArgsForCall(1)
-		Expect(versions).To(Equal(someVersions))
-		Expect(job).To(Equal(atc.JobConfig{Name: "some-other-job"}))
+		Expect(jobs).To(Equal(atc.JobConfigs{
+			{Name: "some-job"},
+			{Name: "some-other-job"},
+		}))
 		Expect(resources).To(Equal(initialConfig.Resources))
 		Expect(resourceTypes).To(Equal(initialConfig.ResourceTypes))
 	})
@@ -163,23 +159,23 @@ var _ = Describe("Runner", func() {
 		})
 	})
 
-	failingGetConfigStubWith := func(found bool, err error) func() (atc.Config, db.ConfigVersion, bool, error) {
+	ReloadConfigStubWith := func(found bool, err error) func() (bool, error) {
 		calls := 0
 
-		return func() (atc.Config, db.ConfigVersion, bool, error) {
+		return func() (bool, error) {
 			if calls == 1 {
-				return atc.Config{}, 0, found, err
+				return found, err
 			}
 
 			calls++
 
-			return initialConfig, 1, true, nil
+			return found, err
 		}
 	}
 
 	Context("when the pipeline is destroyed", func() {
 		BeforeEach(func() {
-			pipelineDB.GetConfigStub = failingGetConfigStubWith(false, nil)
+			pipelineDB.ReloadStub = ReloadConfigStubWith(false, nil)
 		})
 
 		It("exits", func() {
@@ -189,11 +185,11 @@ var _ = Describe("Runner", func() {
 
 	Context("when getting the config fails for some other reason", func() {
 		BeforeEach(func() {
-			pipelineDB.GetConfigStub = failingGetConfigStubWith(false, errors.New("idk lol"))
+			pipelineDB.ReloadStub = ReloadConfigStubWith(false, errors.New("idk lol"))
 		})
 
 		It("keeps on truckin'", func() {
-			Eventually(pipelineDB.GetConfigCallCount).Should(BeNumerically(">=", 2))
+			Eventually(pipelineDB.ReloadCallCount).Should(BeNumerically(">=", 2))
 		})
 	})
 })

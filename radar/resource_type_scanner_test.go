@@ -52,7 +52,8 @@ var _ = Describe("ResourceTypeScanner", func() {
 			return "pipeline:" + thing
 		}
 
-		fakeRadarDB.GetConfigReturns(atc.Config{
+		fakeRadarDB.ReloadReturns(true, nil)
+		fakeRadarDB.ConfigReturns(atc.Config{
 			ResourceTypes: atc.ResourceTypes{
 				{
 					Name:   "some-resource-type",
@@ -60,12 +61,17 @@ var _ = Describe("ResourceTypeScanner", func() {
 					Source: atc.Source{"custom": "source"},
 				},
 			},
-		}, 1, true, nil)
+		})
 
 		savedResourceType = db.SavedResourceType{
 			ID:   39,
 			Name: "some-resource-type",
 			Type: "docker-image",
+			Config: atc.ResourceType{
+				Name:   "some-resource-type",
+				Type:   "docker-image",
+				Source: atc.Source{"custom": "source"},
+			},
 		}
 		fakeRadarDB.TeamIDReturns(teamID)
 
@@ -90,9 +96,9 @@ var _ = Describe("ResourceTypeScanner", func() {
 			actualInterval, runErr = scanner.Run(lagertest.NewTestLogger("test"), "some-resource-type")
 		})
 
-		Context("when the lease cannot be acquired", func() {
+		Context("when the lock cannot be acquired", func() {
 			BeforeEach(func() {
-				fakeRadarDB.LeaseResourceTypeCheckingReturns(nil, false, nil)
+				fakeRadarDB.AcquireResourceTypeCheckingLockReturns(nil, false, nil)
 			})
 
 			It("does not check", func() {
@@ -105,9 +111,9 @@ var _ = Describe("ResourceTypeScanner", func() {
 			})
 		})
 
-		Context("when the lease can be acquired", func() {
+		Context("when the lock can be acquired", func() {
 			BeforeEach(func() {
-				fakeRadarDB.LeaseResourceTypeCheckingReturns(fakeLease, true, nil)
+				fakeRadarDB.AcquireResourceTypeCheckingLockReturns(fakeLease, true, nil)
 			})
 
 			It("checks immediately", func() {
@@ -142,11 +148,11 @@ var _ = Describe("ResourceTypeScanner", func() {
 				Expect(delegate).To(Equal(worker.NoopImageFetchingDelegate{}))
 			})
 
-			It("grabs a periodic resource checking lease before checking, breaks lease after done", func() {
-				Expect(fakeRadarDB.LeaseResourceTypeCheckingCallCount()).To(Equal(1))
+			It("grabs a periodic resource checking lock before checking, breaks lock after done", func() {
+				Expect(fakeRadarDB.AcquireResourceTypeCheckingLockCallCount()).To(Equal(1))
 
-				_, resourceTypeName, leaseInterval, immediate := fakeRadarDB.LeaseResourceTypeCheckingArgsForCall(0)
-				Expect(resourceTypeName).To(Equal("some-resource-type"))
+				_, resourceType, leaseInterval, immediate := fakeRadarDB.AcquireResourceTypeCheckingLockArgsForCall(0)
+				Expect(resourceType.Name).To(Equal("some-resource-type"))
 				Expect(leaseInterval).To(Equal(interval))
 				Expect(immediate).To(BeFalse())
 

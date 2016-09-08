@@ -3,24 +3,10 @@
   <head>
     <title>{{template "title" .}}</title>
     <link href="{{asset "main.css"}}" media="all" rel="stylesheet" type="text/css" />
-
-    <link rel="apple-touch-icon" sizes="57x57" href="{{asset "favicons/apple-touch-icon-57x57.png"}}" />
-    <link rel="apple-touch-icon" sizes="60x60" href="{{asset "favicons/apple-touch-icon-60x60.png"}}" />
-    <link rel="apple-touch-icon" sizes="72x72" href="{{asset "favicons/apple-touch-icon-72x72.png"}}" />
-    <link rel="apple-touch-icon" sizes="76x76" href="{{asset "favicons/apple-touch-icon-76x76.png"}}" />
-    <link rel="apple-touch-icon" sizes="114x114" href="{{asset "favicons/apple-touch-icon-114x114.png"}}" />
-    <link rel="apple-touch-icon" sizes="120x120" href="{{asset "favicons/apple-touch-icon-120x120.png"}}" />
-    <link rel="apple-touch-icon" sizes="144x144" href="{{asset "favicons/apple-touch-icon-144x144.png"}}" />
-    <link rel="apple-touch-icon" sizes="152x152" href="{{asset "favicons/apple-touch-icon-152x152.png"}}" />
-    <link rel="apple-touch-icon" sizes="180x180" href="{{asset "favicons/apple-touch-icon-180x180.png"}}" />
-    <link rel="icon" type="image/png" href="{{asset "favicons/favicon-32x32.png"}}" sizes="32x32" />
-    <link rel="icon" type="image/png" href="{{asset "favicons/android-chrome-192x192.png"}}" sizes="192x192" />
-    <link rel="icon" type="image/png" href="{{asset "favicons/favicon-96x96.png"}}" sizes="96x96" />
-    <link rel="icon" type="image/png" href="{{asset "favicons/favicon-16x16.png"}}" sizes="16x16" />
-    <link rel="manifest" href="{{asset "favicons/manifest.json"}}" />
-    <meta name="msapplication-TileColor" content="#000000" />
-    <meta name="msapplication-TileImage" content="{{asset "favicons/mstile-144x144.png"}}" />
+    <link id="favicon" rel="icon" type="image/png" href="{{asset "images/favicon.png"}}" />
     <meta name="theme-color" content="#000000" />
+    <script src="{{asset "jquery-2.1.1.min.js"}}"></script>
+    <script src="{{asset "concourse.js"}}"></script>
     <script src="{{asset "elm.min.js"}}"></script>
   </head>
   <body>
@@ -36,50 +22,39 @@
       <div class="bottom">
         <div id="pipelines-nav-app" class="sidebar js-sidebar test"></div>
 
+        <script type="text/javascript">
+        Elm.PipelinesNavPage.embed(document.getElementById("pipelines-nav-app"));
+
+        var selectedGroups = [];
+        var groupStates = {{.GroupStates}};
+        for (var g in groupStates) {
+          var group = groupStates[g];
+          if (group.Enabled) {
+            selectedGroups.push(group.Name);
+          }
+        }
+
+        var topBar = Elm.TopBarPage.embed(document.getElementById("top-bar-app"), {
+          pipeline: {
+            teamName: {{.TeamName}},
+            pipelineName: {{.PipelineName}}
+          },
+          selectedGroups: selectedGroups
+        });
+
+        topBar.ports.toggleSidebar.subscribe(function() {
+          $('.js-sidebar').toggleClass('visible');
+        });
+
+        topBar.ports.navigateTo.subscribe(function(url) {
+          window.location.href = url;
+        });
+        </script>
+
         <div id="content">
         {{template "body" .}}
         </div>
       </div>
     </div>
-
-    <script type="text/javascript">
-    Elm.PipelinesNavPage.embed(document.getElementById("pipelines-nav-app"));
-
-    var selectedGroups = [];
-    var groupStates = {{.GroupStates}};
-    for (var g in groupStates) {
-      var group = groupStates[g];
-      if (group.Enabled) {
-        selectedGroups.push(group.Name);
-      }
-    }
-
-    var topBar = Elm.TopBarPage.embed(document.getElementById("top-bar-app"), {
-      pipeline: {
-        teamName: {{.TeamName}},
-        pipelineName: {{.PipelineName}}
-      },
-      selectedGroups: selectedGroups,
-      viewingPipeline: !!concourse.isPipeline
-    });
-
-    topBar.ports.toggleSidebar.subscribe(function() {
-      $('.js-sidebar').toggleClass('visible');
-    });
-
-    topBar.ports.navigateTo.subscribe(function(url) {
-      window.location.href = url;
-    });
-
-    topBar.ports.setGroups.subscribe(function(groups) {
-      for (var group in concourse.groups) {
-        concourse.groups[group] = groups.indexOf(group) !== -1;
-      }
-
-      if (concourse.redraw !== undefined) {
-        concourse.redraw();
-      }
-    });
-    </script>
   </body>
 </html>

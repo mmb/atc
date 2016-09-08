@@ -2,7 +2,6 @@ package algorithm
 
 import (
 	"fmt"
-	"log"
 	"sort"
 )
 
@@ -114,7 +113,6 @@ type constraintFunc func(version) bool
 func (cs constraints) check(v version) bool {
 	for _, c := range cs {
 		if !c(v) {
-			log.Println("FAILED", v.order)
 			return false
 		}
 	}

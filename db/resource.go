@@ -15,12 +15,8 @@ type SavedResource struct {
 	CheckError   error
 	Paused       bool
 	PipelineName string
+	Config       atc.ResourceConfig
 	Resource
-}
-
-type DashboardResource struct {
-	Resource       SavedResource
-	ResourceConfig atc.ResourceConfig
 }
 
 type SavedResourceType struct {
@@ -28,6 +24,7 @@ type SavedResourceType struct {
 	Name    string
 	Type    string
 	Version Version
+	Config  atc.ResourceType
 }
 
 func (r SavedResource) FailingToCheck() bool {

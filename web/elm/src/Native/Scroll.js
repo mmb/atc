@@ -1,7 +1,8 @@
 var _concourse$atc$Native_Scroll = function() {
-  function toBottom() {
+  function toBottom(id) {
     return _elm_lang$core$Native_Scheduler.nativeBinding(function(callback) {
-      window.scrollTo(0, document.body.scrollHeight);
+      var ele = document.getElementById(id);
+      ele.scrollTop = ele.scrollHeight - ele.clientHeight;
       callback(_elm_lang$core$Native_Scheduler.succeed(_elm_lang$core$Native_Utils.Tuple0));
     });
   }

@@ -43,33 +43,36 @@ func (scanner *resourceTypeScanner) Run(logger lager.Logger, resourceTypeName st
 		return scanner.defaultInterval, nil
 	}
 
-	resourceType, err := scanner.getResourceTypeConfig(logger, resourceTypeName)
+	savedResourceType, found, err := scanner.db.GetResourceType(resourceTypeName)
 	if err != nil {
+		logger.Error("failed-to-get-current-version", err)
 		return 0, err
 	}
 
-	leaseLogger := logger.Session("lease", lager.Data{
+	if !found {
+		return 0, db.ResourceTypeNotFoundError{Name: resourceTypeName}
+	}
+
+	lockLogger := logger.Session("lock", lager.Data{
 		"resource-type": resourceTypeName,
 	})
 
-	lease, leased, err := scanner.db.LeaseResourceTypeChecking(logger, resourceTypeName, scanner.defaultInterval, false)
-
+	lock, acquired, err := scanner.db.AcquireResourceTypeCheckingLock(logger, savedResourceType, scanner.defaultInterval, false)
 	if err != nil {
-		leaseLogger.Error("failed-to-get-lease", err, lager.Data{
+		lockLogger.Error("failed-to-get-lock", err, lager.Data{
 			"resource-type": resourceTypeName,
 		})
 		return scanner.defaultInterval, ErrFailedToAcquireLease
 	}
 
-	if !leased {
-		leaseLogger.Debug("did-not-get-lease")
+	if !acquired {
+		lockLogger.Debug("did-not-get-lock")
 		return scanner.defaultInterval, ErrFailedToAcquireLease
 	}
 
-	err = scanner.resourceTypeScan(logger.Session("tick"), resourceType)
+	defer lock.Release()
 
-	lease.Break()
-
+	err = scanner.resourceTypeScan(logger.Session("tick"), savedResourceType.Config, savedResourceType.Version)
 	if err != nil {
 		return 0, err
 	}
@@ -85,18 +88,7 @@ func (scanner *resourceTypeScanner) ScanFromVersion(logger lager.Logger, resourc
 	return nil
 }
 
-func (scanner *resourceTypeScanner) resourceTypeScan(logger lager.Logger, resourceType atc.ResourceType) error {
-	vr, found, err := scanner.db.GetResourceType(resourceType.Name)
-	if err != nil {
-		logger.Error("failed-to-get-current-version", err)
-		return err
-	}
-
-	var from db.Version
-	if found {
-		from = vr.Version
-	}
-
+func (scanner *resourceTypeScanner) resourceTypeScan(logger lager.Logger, resourceType atc.ResourceType, fromVersion db.Version) error {
 	pipelineID := scanner.db.GetPipelineID()
 
 	session := resource.Session{
@@ -134,7 +126,7 @@ func (scanner *resourceTypeScanner) resourceTypeScan(logger lager.Logger, resour
 
 	logger.Debug("checking")
 
-	newVersions, err := res.Check(resourceType.Source, atc.Version(from))
+	newVersions, err := res.Check(resourceType.Source, atc.Version(fromVersion))
 	if err != nil {
 		if rErr, ok := err.(resource.ErrResourceScriptFailed); ok {
 			logger.Info("check-failed", lager.Data{"exit-status": rErr.ExitStatus})
@@ -165,25 +157,4 @@ func (scanner *resourceTypeScanner) resourceTypeScan(logger lager.Logger, resour
 	}
 
 	return nil
-}
-
-func (scanner *resourceTypeScanner) getResourceTypeConfig(logger lager.Logger, resourceTypeName string) (atc.ResourceType, error) {
-	config, _, found, err := scanner.db.GetConfig()
-	if err != nil {
-		logger.Error("failed-to-get-config", err)
-		return atc.ResourceType{}, err
-	}
-
-	if !found {
-		logger.Info("pipeline-removed")
-		return atc.ResourceType{}, errPipelineRemoved
-	}
-
-	resourceType, found := config.ResourceTypes.Lookup(resourceTypeName)
-	if !found {
-		logger.Info("resource-type-removed-from-configuration")
-		return resourceType, ResourceNotConfiguredError{ResourceName: resourceTypeName}
-	}
-
-	return resourceType, nil
 }

@@ -14,6 +14,7 @@ import (
 	"code.cloudfoundry.org/gunk/urljoiner"
 	"github.com/concourse/atc"
 	"github.com/concourse/atc/db"
+	"github.com/concourse/atc/db/dbfakes"
 )
 
 var _ = Describe("Resource Pausing", func() {
@@ -27,13 +28,18 @@ var _ = Describe("Resource Pausing", func() {
 		dbListener = pq.NewListener(postgresRunner.DataSourceName(), time.Second, time.Minute, nil)
 		bus := db.NewNotificationsBus(dbListener, dbConn)
 
-		sqlDB = db.NewSQL(dbConn, bus)
+		pgxConn := postgresRunner.OpenPgx()
+		fakeConnector := new(dbfakes.FakeConnector)
+		retryableConn := &db.RetryableConn{Connector: fakeConnector, Conn: pgxConn}
+
+		lockFactory := db.NewLockFactory(retryableConn)
+		sqlDB = db.NewSQL(dbConn, bus, lockFactory)
 
 		atcCommand = NewATCCommand(atcBin, 1, postgresRunner.DataSourceName(), []string{}, BASIC_AUTH)
 		err := atcCommand.Start()
 		Expect(err).NotTo(HaveOccurred())
 
-		teamDBFactory := db.NewTeamDBFactory(dbConn, bus)
+		teamDBFactory := db.NewTeamDBFactory(dbConn, bus, lockFactory)
 		teamDB := teamDBFactory.GetTeamDB(atc.DefaultTeamName)
 		// job build data
 		_, _, err = teamDB.SaveConfig("some-pipeline", atc.Config{
@@ -57,7 +63,7 @@ var _ = Describe("Resource Pausing", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(found).To(BeTrue())
 
-		pipelineDBFactory := db.NewPipelineDBFactory(dbConn, bus)
+		pipelineDBFactory := db.NewPipelineDBFactory(dbConn, bus, lockFactory)
 		pipelineDB = pipelineDBFactory.Build(savedPipeline)
 	})
 
@@ -99,16 +105,21 @@ var _ = Describe("Resource Pausing", func() {
 
 			// resource detail -> paused resource detail
 			Eventually(page).Should(HaveURL(withPath("/teams/main/pipelines/some-pipeline/resources/resource-name")))
-			Expect(page.Find("h1")).To(HaveText("resource-name"))
+			Eventually(page.Find("h1")).Should(HaveText("resource-name"))
 
-			Expect(page.Find(".js-resource .js-pauseUnpause").Click()).To(Succeed())
+			// pause
+			Eventually(page.Find(".btn-pause.fl")).Should(BeFound())
+			Expect(page.Find(".btn-pause.fl").Click()).To(Succeed())
+			Eventually(page.Find(".header i.fa-play")).Should(BeFound())
 
 			Expect(page.Navigate(homepage())).To(Succeed())
 			Eventually(page.FindByLink("resource-name")).Should(BeFound())
 			Expect(page.FindByLink("resource-name").Click()).To(Succeed())
-			Expect(page.Find(".js-resource .js-pauseUnpause").Click()).To(Succeed())
 
-			Eventually(page.Find(".header i.fa-play")).Should(BeFound())
+			// unpause
+			Eventually(page.Find(".btn-pause.fl")).Should(BeFound())
+			Expect(page.Find(".btn-pause.fl").Click()).To(Succeed())
+			Eventually(page.Find(".header i.fa-pause")).Should(BeFound())
 
 			resource, _, err := pipelineDB.GetResource("resource-name")
 			Expect(err).NotTo(HaveOccurred())

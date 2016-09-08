@@ -23,28 +23,26 @@ type WorkerDB interface {
 	CreateContainer(container db.Container, ttl time.Duration, maxLifetime time.Duration, volumeHandles []string) (db.SavedContainer, error)
 	GetContainer(string) (db.SavedContainer, bool, error)
 	FindContainerByIdentifier(db.ContainerIdentifier) (db.SavedContainer, bool, error)
-
-	FindWorkerCheckResourceTypeVersion(workerName string, checkType string) (string, bool, error)
-
 	UpdateExpiresAtOnContainer(handle string, ttl time.Duration) error
 	ReapContainer(handle string) error
-
+	GetPipelineByID(pipelineID int) (db.SavedPipeline, error)
 	InsertVolume(db.Volume) error
 	GetVolumesByIdentifier(db.VolumeIdentifier) ([]db.SavedVolume, error)
 	GetVolumeTTL(volumeHandle string) (time.Duration, bool, error)
 	ReapVolume(handle string) error
+	SetVolumeTTLAndSizeInBytes(string, time.Duration, int64) error
 	SetVolumeTTL(string, time.Duration) error
-	SetVolumeSizeInBytes(string, int64) error
 }
 
 var ErrMultipleWorkersWithName = errors.New("More than one worker has given worker name")
 
 type dbProvider struct {
-	logger       lager.Logger
-	db           WorkerDB
-	dialer       gconn.DialerFunc
-	retryPolicy  transport.RetryPolicy
-	imageFactory ImageFactory
+	logger            lager.Logger
+	db                WorkerDB
+	dialer            gconn.DialerFunc
+	retryPolicy       transport.RetryPolicy
+	imageFactory      ImageFactory
+	pipelineDBFactory db.PipelineDBFactory
 }
 
 func NewDBWorkerProvider(
@@ -53,13 +51,15 @@ func NewDBWorkerProvider(
 	dialer gconn.DialerFunc,
 	retryPolicy transport.RetryPolicy,
 	imageFactory ImageFactory,
+	pipelineDBFactory db.PipelineDBFactory,
 ) WorkerProvider {
 	return &dbProvider{
-		logger:       logger,
-		db:           db,
-		dialer:       dialer,
-		retryPolicy:  retryPolicy,
-		imageFactory: imageFactory,
+		logger:            logger,
+		db:                db,
+		dialer:            dialer,
+		retryPolicy:       retryPolicy,
+		imageFactory:      imageFactory,
+		pipelineDBFactory: pipelineDBFactory,
 	}
 }
 
@@ -114,6 +114,7 @@ func (provider *dbProvider) newGardenWorker(tikTok clock.Clock, savedWorker db.S
 		provider.db,
 		provider.logger.Session("garden-connection"),
 		savedWorker.Name,
+		savedWorker.GardenAddr,
 		provider.retryPolicy,
 	)
 
@@ -142,6 +143,7 @@ func (provider *dbProvider) newGardenWorker(tikTok clock.Clock, savedWorker db.S
 		volumeClient,
 		volumeFactory,
 		provider.imageFactory,
+		provider.pipelineDBFactory,
 		provider.db,
 		provider,
 		tikTok,

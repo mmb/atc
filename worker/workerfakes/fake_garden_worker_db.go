@@ -49,16 +49,14 @@ type FakeGardenWorkerDB struct {
 	reapContainerReturns struct {
 		result1 error
 	}
-	FindWorkerCheckResourceTypeVersionStub        func(workerName string, checkType string) (string, bool, error)
-	findWorkerCheckResourceTypeVersionMutex       sync.RWMutex
-	findWorkerCheckResourceTypeVersionArgsForCall []struct {
-		workerName string
-		checkType  string
+	GetPipelineByIDStub        func(pipelineID int) (db.SavedPipeline, error)
+	getPipelineByIDMutex       sync.RWMutex
+	getPipelineByIDArgsForCall []struct {
+		pipelineID int
 	}
-	findWorkerCheckResourceTypeVersionReturns struct {
-		result1 string
-		result2 bool
-		result3 error
+	getPipelineByIDReturns struct {
+		result1 db.SavedPipeline
+		result2 error
 	}
 	InsertVolumeStub        func(db.Volume) error
 	insertVolumeMutex       sync.RWMutex
@@ -68,13 +66,14 @@ type FakeGardenWorkerDB struct {
 	insertVolumeReturns struct {
 		result1 error
 	}
-	SetVolumeTTLStub        func(string, time.Duration) error
-	setVolumeTTLMutex       sync.RWMutex
-	setVolumeTTLArgsForCall []struct {
+	SetVolumeTTLAndSizeInBytesStub        func(string, time.Duration, int64) error
+	setVolumeTTLAndSizeInBytesMutex       sync.RWMutex
+	setVolumeTTLAndSizeInBytesArgsForCall []struct {
 		arg1 string
 		arg2 time.Duration
+		arg3 int64
 	}
-	setVolumeTTLReturns struct {
+	setVolumeTTLAndSizeInBytesReturns struct {
 		result1 error
 	}
 	GetVolumeTTLStub        func(string) (time.Duration, bool, error)
@@ -244,40 +243,38 @@ func (fake *FakeGardenWorkerDB) ReapContainerReturns(result1 error) {
 	}{result1}
 }
 
-func (fake *FakeGardenWorkerDB) FindWorkerCheckResourceTypeVersion(workerName string, checkType string) (string, bool, error) {
-	fake.findWorkerCheckResourceTypeVersionMutex.Lock()
-	fake.findWorkerCheckResourceTypeVersionArgsForCall = append(fake.findWorkerCheckResourceTypeVersionArgsForCall, struct {
-		workerName string
-		checkType  string
-	}{workerName, checkType})
-	fake.recordInvocation("FindWorkerCheckResourceTypeVersion", []interface{}{workerName, checkType})
-	fake.findWorkerCheckResourceTypeVersionMutex.Unlock()
-	if fake.FindWorkerCheckResourceTypeVersionStub != nil {
-		return fake.FindWorkerCheckResourceTypeVersionStub(workerName, checkType)
+func (fake *FakeGardenWorkerDB) GetPipelineByID(pipelineID int) (db.SavedPipeline, error) {
+	fake.getPipelineByIDMutex.Lock()
+	fake.getPipelineByIDArgsForCall = append(fake.getPipelineByIDArgsForCall, struct {
+		pipelineID int
+	}{pipelineID})
+	fake.recordInvocation("GetPipelineByID", []interface{}{pipelineID})
+	fake.getPipelineByIDMutex.Unlock()
+	if fake.GetPipelineByIDStub != nil {
+		return fake.GetPipelineByIDStub(pipelineID)
 	} else {
-		return fake.findWorkerCheckResourceTypeVersionReturns.result1, fake.findWorkerCheckResourceTypeVersionReturns.result2, fake.findWorkerCheckResourceTypeVersionReturns.result3
+		return fake.getPipelineByIDReturns.result1, fake.getPipelineByIDReturns.result2
 	}
 }
 
-func (fake *FakeGardenWorkerDB) FindWorkerCheckResourceTypeVersionCallCount() int {
-	fake.findWorkerCheckResourceTypeVersionMutex.RLock()
-	defer fake.findWorkerCheckResourceTypeVersionMutex.RUnlock()
-	return len(fake.findWorkerCheckResourceTypeVersionArgsForCall)
+func (fake *FakeGardenWorkerDB) GetPipelineByIDCallCount() int {
+	fake.getPipelineByIDMutex.RLock()
+	defer fake.getPipelineByIDMutex.RUnlock()
+	return len(fake.getPipelineByIDArgsForCall)
 }
 
-func (fake *FakeGardenWorkerDB) FindWorkerCheckResourceTypeVersionArgsForCall(i int) (string, string) {
-	fake.findWorkerCheckResourceTypeVersionMutex.RLock()
-	defer fake.findWorkerCheckResourceTypeVersionMutex.RUnlock()
-	return fake.findWorkerCheckResourceTypeVersionArgsForCall[i].workerName, fake.findWorkerCheckResourceTypeVersionArgsForCall[i].checkType
+func (fake *FakeGardenWorkerDB) GetPipelineByIDArgsForCall(i int) int {
+	fake.getPipelineByIDMutex.RLock()
+	defer fake.getPipelineByIDMutex.RUnlock()
+	return fake.getPipelineByIDArgsForCall[i].pipelineID
 }
 
-func (fake *FakeGardenWorkerDB) FindWorkerCheckResourceTypeVersionReturns(result1 string, result2 bool, result3 error) {
-	fake.FindWorkerCheckResourceTypeVersionStub = nil
-	fake.findWorkerCheckResourceTypeVersionReturns = struct {
-		result1 string
-		result2 bool
-		result3 error
-	}{result1, result2, result3}
+func (fake *FakeGardenWorkerDB) GetPipelineByIDReturns(result1 db.SavedPipeline, result2 error) {
+	fake.GetPipelineByIDStub = nil
+	fake.getPipelineByIDReturns = struct {
+		result1 db.SavedPipeline
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeGardenWorkerDB) InsertVolume(arg1 db.Volume) error {
@@ -313,36 +310,37 @@ func (fake *FakeGardenWorkerDB) InsertVolumeReturns(result1 error) {
 	}{result1}
 }
 
-func (fake *FakeGardenWorkerDB) SetVolumeTTL(arg1 string, arg2 time.Duration) error {
-	fake.setVolumeTTLMutex.Lock()
-	fake.setVolumeTTLArgsForCall = append(fake.setVolumeTTLArgsForCall, struct {
+func (fake *FakeGardenWorkerDB) SetVolumeTTLAndSizeInBytes(arg1 string, arg2 time.Duration, arg3 int64) error {
+	fake.setVolumeTTLAndSizeInBytesMutex.Lock()
+	fake.setVolumeTTLAndSizeInBytesArgsForCall = append(fake.setVolumeTTLAndSizeInBytesArgsForCall, struct {
 		arg1 string
 		arg2 time.Duration
-	}{arg1, arg2})
-	fake.recordInvocation("SetVolumeTTL", []interface{}{arg1, arg2})
-	fake.setVolumeTTLMutex.Unlock()
-	if fake.SetVolumeTTLStub != nil {
-		return fake.SetVolumeTTLStub(arg1, arg2)
+		arg3 int64
+	}{arg1, arg2, arg3})
+	fake.recordInvocation("SetVolumeTTLAndSizeInBytes", []interface{}{arg1, arg2, arg3})
+	fake.setVolumeTTLAndSizeInBytesMutex.Unlock()
+	if fake.SetVolumeTTLAndSizeInBytesStub != nil {
+		return fake.SetVolumeTTLAndSizeInBytesStub(arg1, arg2, arg3)
 	} else {
-		return fake.setVolumeTTLReturns.result1
+		return fake.setVolumeTTLAndSizeInBytesReturns.result1
 	}
 }
 
-func (fake *FakeGardenWorkerDB) SetVolumeTTLCallCount() int {
-	fake.setVolumeTTLMutex.RLock()
-	defer fake.setVolumeTTLMutex.RUnlock()
-	return len(fake.setVolumeTTLArgsForCall)
+func (fake *FakeGardenWorkerDB) SetVolumeTTLAndSizeInBytesCallCount() int {
+	fake.setVolumeTTLAndSizeInBytesMutex.RLock()
+	defer fake.setVolumeTTLAndSizeInBytesMutex.RUnlock()
+	return len(fake.setVolumeTTLAndSizeInBytesArgsForCall)
 }
 
-func (fake *FakeGardenWorkerDB) SetVolumeTTLArgsForCall(i int) (string, time.Duration) {
-	fake.setVolumeTTLMutex.RLock()
-	defer fake.setVolumeTTLMutex.RUnlock()
-	return fake.setVolumeTTLArgsForCall[i].arg1, fake.setVolumeTTLArgsForCall[i].arg2
+func (fake *FakeGardenWorkerDB) SetVolumeTTLAndSizeInBytesArgsForCall(i int) (string, time.Duration, int64) {
+	fake.setVolumeTTLAndSizeInBytesMutex.RLock()
+	defer fake.setVolumeTTLAndSizeInBytesMutex.RUnlock()
+	return fake.setVolumeTTLAndSizeInBytesArgsForCall[i].arg1, fake.setVolumeTTLAndSizeInBytesArgsForCall[i].arg2, fake.setVolumeTTLAndSizeInBytesArgsForCall[i].arg3
 }
 
-func (fake *FakeGardenWorkerDB) SetVolumeTTLReturns(result1 error) {
-	fake.SetVolumeTTLStub = nil
-	fake.setVolumeTTLReturns = struct {
+func (fake *FakeGardenWorkerDB) SetVolumeTTLAndSizeInBytesReturns(result1 error) {
+	fake.SetVolumeTTLAndSizeInBytesStub = nil
+	fake.setVolumeTTLAndSizeInBytesReturns = struct {
 		result1 error
 	}{result1}
 }
@@ -427,12 +425,12 @@ func (fake *FakeGardenWorkerDB) Invocations() map[string][][]interface{} {
 	defer fake.updateExpiresAtOnContainerMutex.RUnlock()
 	fake.reapContainerMutex.RLock()
 	defer fake.reapContainerMutex.RUnlock()
-	fake.findWorkerCheckResourceTypeVersionMutex.RLock()
-	defer fake.findWorkerCheckResourceTypeVersionMutex.RUnlock()
+	fake.getPipelineByIDMutex.RLock()
+	defer fake.getPipelineByIDMutex.RUnlock()
 	fake.insertVolumeMutex.RLock()
 	defer fake.insertVolumeMutex.RUnlock()
-	fake.setVolumeTTLMutex.RLock()
-	defer fake.setVolumeTTLMutex.RUnlock()
+	fake.setVolumeTTLAndSizeInBytesMutex.RLock()
+	defer fake.setVolumeTTLAndSizeInBytesMutex.RUnlock()
 	fake.getVolumeTTLMutex.RLock()
 	defer fake.getVolumeTTLMutex.RUnlock()
 	fake.getVolumesByIdentifierMutex.RLock()

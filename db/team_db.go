@@ -26,6 +26,7 @@ type TeamDB interface {
 	UpdateBasicAuth(basicAuth *BasicAuth) (SavedTeam, error)
 	UpdateGitHubAuth(gitHubAuth *GitHubAuth) (SavedTeam, error)
 	UpdateUAAAuth(uaaAuth *UAAAuth) (SavedTeam, error)
+	UpdateGenericOAuth(genericOAuth *GenericOAuth) (SavedTeam, error)
 
 	GetConfig(pipelineName string) (atc.Config, atc.RawConfig, ConfigVersion, error)
 	SaveConfig(string, atc.Config, ConfigVersion, PipelinePausedState) (SavedPipeline, bool, error)
@@ -360,24 +361,51 @@ func (db *teamDB) SaveConfig(
 		if err != nil {
 			return SavedPipeline{}, false, err
 		}
+
+		_, err = tx.Exec(`
+			UPDATE jobs
+			SET active = false
+			WHERE pipeline_id = $1
+		`, savedPipeline.ID)
+		if err != nil {
+			return SavedPipeline{}, false, err
+		}
+
+		_, err = tx.Exec(`
+			UPDATE resources
+			SET active = false
+			WHERE pipeline_id = $1
+		`, savedPipeline.ID)
+		if err != nil {
+			return SavedPipeline{}, false, err
+		}
+
+		_, err = tx.Exec(`
+			UPDATE resource_types
+			SET active = false
+			WHERE pipeline_id = $1
+		`, savedPipeline.ID)
+		if err != nil {
+			return SavedPipeline{}, false, err
+		}
 	}
 
 	for _, resource := range config.Resources {
-		err = db.registerResource(tx, resource.Name, savedPipeline.ID)
+		err = db.saveResource(tx, resource, savedPipeline.ID)
 		if err != nil {
 			return SavedPipeline{}, false, err
 		}
 	}
 
 	for _, resourceType := range config.ResourceTypes {
-		err = db.registerResourceType(tx, resourceType, savedPipeline.ID)
+		err = db.saveResourceType(tx, resourceType, savedPipeline.ID)
 		if err != nil {
 			return SavedPipeline{}, false, err
 		}
 	}
 
 	for _, job := range config.Jobs {
-		err = db.registerJob(tx, job.Name, savedPipeline.ID)
+		err = db.saveJob(tx, job, savedPipeline.ID)
 		if err != nil {
 			return SavedPipeline{}, false, err
 		}
@@ -393,14 +421,29 @@ func (db *teamDB) SaveConfig(
 	return savedPipeline, created, tx.Commit()
 }
 
-func (db *teamDB) registerJob(tx Tx, name string, pipelineID int) error {
-	_, err := tx.Exec(`
-		INSERT INTO jobs (name, pipeline_id)
-		SELECT $1, $2
-		WHERE NOT EXISTS (
-			SELECT 1 FROM jobs WHERE name = $1 AND pipeline_id = $2
-		)
-	`, name, pipelineID)
+func (db *teamDB) saveJob(tx Tx, job atc.JobConfig, pipelineID int) error {
+	configPayload, err := json.Marshal(job)
+	if err != nil {
+		return err
+	}
+
+	updated, err := checkIfRowsUpdated(tx, `
+		UPDATE jobs
+		SET config = $3, active = true
+		WHERE name = $1 AND pipeline_id = $2
+	`, job.Name, pipelineID, configPayload)
+	if err != nil {
+		return err
+	}
+
+	if updated {
+		return nil
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO jobs (name, pipeline_id, config, active)
+		VALUES ($1, $2, $3, true)
+	`, job.Name, pipelineID, configPayload)
 
 	return swallowUniqueViolation(err)
 }
@@ -421,36 +464,63 @@ func (db *teamDB) registerSerialGroup(tx Tx, jobName, serialGroup string, pipeli
 	return swallowUniqueViolation(err)
 }
 
-func (db *teamDB) registerResource(tx Tx, name string, pipelineID int) error {
-	_, err := tx.Exec(`
-		INSERT INTO resources (name, pipeline_id)
-		SELECT $1, $2
-		WHERE NOT EXISTS (
-			SELECT 1 FROM resources WHERE name = $1 AND pipeline_id = $2
-		)
-	`, name, pipelineID)
+func (db *teamDB) saveResource(tx Tx, resource atc.ResourceConfig, pipelineID int) error {
+	configPayload, err := json.Marshal(resource)
+	if err != nil {
+		return err
+	}
+
+	updated, err := checkIfRowsUpdated(tx, `
+		UPDATE resources
+		SET config = $3, active = true
+		WHERE name = $1 AND pipeline_id = $2
+	`, resource.Name, pipelineID, configPayload)
+	if err != nil {
+		return err
+	}
+
+	if updated {
+		return nil
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO resources (name, pipeline_id, config, active)
+		VALUES ($1, $2, $3, true)
+	`, resource.Name, pipelineID, configPayload)
 
 	return swallowUniqueViolation(err)
 }
 
-func (db *teamDB) registerResourceType(tx Tx, resourceType atc.ResourceType, pipelineID int) error {
-	_, err := tx.Exec(`
-		INSERT INTO resource_types (name, type, pipeline_id)
-		SELECT $1, $2, $3
-		WHERE NOT EXISTS (
-			SELECT 1 FROM resource_types
-				WHERE name = $1
-				AND type = $2
-				AND pipeline_id = $3
-		)
-	`, resourceType.Name, resourceType.Type, pipelineID)
+func (db *teamDB) saveResourceType(tx Tx, resourceType atc.ResourceType, pipelineID int) error {
+	configPayload, err := json.Marshal(resourceType)
+	if err != nil {
+		return err
+	}
+
+	updated, err := checkIfRowsUpdated(tx, `
+		UPDATE resource_types
+		SET config = $3, type = $4, active = true
+		WHERE name = $1 AND pipeline_id = $2
+	`, resourceType.Name, pipelineID, configPayload, resourceType.Type)
+	if err != nil {
+		return err
+	}
+
+	if updated {
+		return nil
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO resource_types (name, type, pipeline_id, config, active)
+		VALUES ($1, $2, $3, $4, true)
+	`, resourceType.Name, resourceType.Type, pipelineID, configPayload)
 
 	return swallowUniqueViolation(err)
 }
 
 func (db *teamDB) GetTeam() (SavedTeam, bool, error) {
 	query := `
-		SELECT id, name, admin, basic_auth, github_auth, uaa_auth
+		SELECT id, name, admin, basic_auth, github_auth, uaa_auth, genericoauth_auth
 		FROM teams
 		WHERE LOWER(name) = LOWER($1)
 	`
@@ -468,7 +538,7 @@ func (db *teamDB) GetTeam() (SavedTeam, bool, error) {
 }
 
 func (db *teamDB) queryTeam(query string, params []interface{}) (SavedTeam, error) {
-	var basicAuth, gitHubAuth, uaaAuth sql.NullString
+	var basicAuth, gitHubAuth, uaaAuth, genericOAuth sql.NullString
 	var savedTeam SavedTeam
 
 	tx, err := db.conn.Begin()
@@ -484,6 +554,7 @@ func (db *teamDB) queryTeam(query string, params []interface{}) (SavedTeam, erro
 		&basicAuth,
 		&gitHubAuth,
 		&uaaAuth,
+		&genericOAuth,
 	)
 	if err != nil {
 		return savedTeam, err
@@ -514,6 +585,13 @@ func (db *teamDB) queryTeam(query string, params []interface{}) (SavedTeam, erro
 		}
 	}
 
+	if genericOAuth.Valid {
+		err = json.Unmarshal([]byte(genericOAuth.String), &savedTeam.GenericOAuth)
+		if err != nil {
+			return savedTeam, err
+		}
+	}
+
 	return savedTeam, nil
 }
 
@@ -527,7 +605,7 @@ func (db *teamDB) UpdateBasicAuth(basicAuth *BasicAuth) (SavedTeam, error) {
 		UPDATE teams
 		SET basic_auth = $1
 		WHERE LOWER(name) = LOWER($2)
-		RETURNING id, name, admin, basic_auth, github_auth, uaa_auth
+		RETURNING id, name, admin, basic_auth, github_auth, uaa_auth, genericoauth_auth
 	`
 
 	params := []interface{}{encryptedBasicAuth, db.teamName}
@@ -549,7 +627,7 @@ func (db *teamDB) UpdateGitHubAuth(gitHubAuth *GitHubAuth) (SavedTeam, error) {
 		UPDATE teams
 		SET github_auth = $1
 		WHERE LOWER(name) = LOWER($2)
-		RETURNING id, name, admin, basic_auth, github_auth, uaa_auth
+		RETURNING id, name, admin, basic_auth, github_auth, uaa_auth, genericoauth_auth
 	`
 	params := []interface{}{string(jsonEncodedGitHubAuth), db.teamName}
 	return db.queryTeam(query, params)
@@ -565,9 +643,25 @@ func (db *teamDB) UpdateUAAAuth(uaaAuth *UAAAuth) (SavedTeam, error) {
 		UPDATE teams
 		SET uaa_auth = $1
 		WHERE LOWER(name) = LOWER($2)
-		RETURNING id, name, admin, basic_auth, github_auth, uaa_auth
+		RETURNING id, name, admin, basic_auth, github_auth, uaa_auth, genericoauth_auth
 	`
 	params := []interface{}{string(jsonEncodedUAAAuth), db.teamName}
+	return db.queryTeam(query, params)
+}
+
+func (db *teamDB) UpdateGenericOAuth(genericOAuth *GenericOAuth) (SavedTeam, error) {
+	jsonEncodedGenericOAuth, err := json.Marshal(genericOAuth)
+	if err != nil {
+		return SavedTeam{}, err
+	}
+
+	query := `
+		UPDATE teams
+		SET genericoauth_auth = $1
+		WHERE LOWER(name) = LOWER($2)
+		RETURNING id, name, admin, basic_auth, github_auth, uaa_auth, genericoauth_auth
+	`
+	params := []interface{}{string(jsonEncodedGenericOAuth), db.teamName}
 	return db.queryTeam(query, params)
 }
 
@@ -606,11 +700,6 @@ func (db *teamDB) CreateOneOffBuild() (Build, error) {
 }
 
 func (db *teamDB) Workers() ([]SavedWorker, error) {
-	err := reapExpiredWorkers(db.conn)
-	if err != nil {
-		return nil, err
-	}
-
 	team, found, err := db.GetTeam()
 	if err != nil {
 		return nil, err
@@ -626,7 +715,8 @@ func (db *teamDB) Workers() ([]SavedWorker, error) {
 		FROM workers as w
 		LEFT OUTER JOIN teams as t
 			ON t.id = w.team_id
-		WHERE t.id = $1 OR w.team_id IS NULL
+		WHERE (t.id = $1 OR w.team_id IS NULL)
+		AND (expires IS NULL OR expires > NOW())
 	`, teamID)
 
 	if err != nil {

@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 )
@@ -12,15 +11,11 @@ var workerColumns = "EXTRACT(epoch FROM expires - NOW()), addr, baggageclaim_url
 var actualWorkerColumns = "EXTRACT(epoch FROM expires - NOW()), addr, baggageclaim_url, http_proxy_url, https_proxy_url, no_proxy, active_containers, resource_types, platform, tags, name, start_time"
 
 func (db *SQLDB) Workers() ([]SavedWorker, error) {
-	err := reapExpiredWorkers(db.conn)
-	if err != nil {
-		return nil, err
-	}
-
 	rows, err := db.conn.Query(`
 		SELECT ` + workerColumns + `
 		FROM workers as w
 		LEFT OUTER JOIN teams as t ON t.id = w.team_id
+		WHERE (expires IS NULL OR expires > NOW())
 	`)
 	if err != nil {
 		return nil, err
@@ -41,37 +36,13 @@ func (db *SQLDB) Workers() ([]SavedWorker, error) {
 	return savedWorkers, nil
 }
 
-func (db *SQLDB) FindWorkerCheckResourceTypeVersion(workerName string, checkType string) (string, bool, error) {
-	savedWorker, found, err := db.GetWorker(workerName)
-
-	if err != nil {
-		return "", false, err
-	}
-
-	if !found {
-		return "", false, errors.New("worker-not-found")
-	}
-
-	for _, workerResourceType := range savedWorker.ResourceTypes {
-		if checkType == workerResourceType.Type {
-			return workerResourceType.Version, true, nil
-		}
-	}
-
-	return "", false, nil
-}
-
 func (db *SQLDB) GetWorker(name string) (SavedWorker, bool, error) {
-	err := reapExpiredWorkers(db.conn)
-	if err != nil {
-		return SavedWorker{}, false, err
-	}
-
 	savedWorker, err := scanWorker(db.conn.QueryRow(`
 		SELECT `+workerColumns+`
 		FROM workers as w
 		LEFT OUTER JOIN teams as t ON t.id = team_id
 		WHERE w.name = $1
+		AND (expires IS NULL OR expires > NOW())
 	`, name), true)
 
 	if err != nil {
@@ -129,8 +100,8 @@ func (db *SQLDB) SaveWorker(info WorkerInfo, ttl time.Duration) (SavedWorker, er
 	return savedWorker, nil
 }
 
-func reapExpiredWorkers(dbConn Conn) error {
-	_, err := dbConn.Exec(`
+func (db *SQLDB) ReapExpiredWorkers() error {
+	_, err := db.conn.Exec(`
 		DELETE FROM workers
 		WHERE expires IS NOT NULL
 		AND expires < NOW()

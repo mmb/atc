@@ -9,6 +9,7 @@ import (
 
 	"github.com/concourse/atc"
 	"github.com/concourse/atc/db"
+	"github.com/concourse/atc/db/dbfakes"
 )
 
 var _ = Describe("Keeping track of workers", func() {
@@ -27,7 +28,12 @@ var _ = Describe("Keeping track of workers", func() {
 		Eventually(listener.Ping, 5*time.Second).ShouldNot(HaveOccurred())
 		bus := db.NewNotificationsBus(listener, dbConn)
 
-		database = db.NewSQL(dbConn, bus)
+		pgxConn := postgresRunner.OpenPgx()
+		fakeConnector := new(dbfakes.FakeConnector)
+		retryableConn := &db.RetryableConn{Connector: fakeConnector, Conn: pgxConn}
+
+		lockFactory := db.NewLockFactory(retryableConn)
+		database = db.NewSQL(dbConn, bus, lockFactory)
 	})
 
 	AfterEach(func() {
@@ -38,7 +44,7 @@ var _ = Describe("Keeping track of workers", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("can keep track of workers", func() {
+	It("can keep track of non-expired workers", func() {
 		Expect(database.Workers()).To(BeEmpty())
 
 		infoA := db.WorkerInfo{
@@ -243,97 +249,6 @@ var _ = Describe("Keeping track of workers", func() {
 
 		Consistently(workerFound, ttl/2).Should(BeTrue())
 		Eventually(workerFound, 2*ttl).Should(BeFalse())
-	})
-
-	Describe("FindWorkerCheckResourceTypeVersion", func() {
-		var container db.SavedContainer
-
-		BeforeEach(func() {
-			container = db.SavedContainer{
-				Container: db.Container{
-					ContainerIdentifier: db.ContainerIdentifier{
-						ResourceTypeVersion: atc.Version{
-							"custom-type": "some-version",
-						},
-						CheckType: "custom-type",
-					},
-					ContainerMetadata: db.ContainerMetadata{
-						WorkerName: "some-worker",
-					},
-				},
-			}
-		})
-
-		Context("when container version matches worker's", func() {
-			BeforeEach(func() {
-				workerInfo := db.WorkerInfo{
-					Name: "some-worker",
-					ResourceTypes: []atc.WorkerResourceType{
-						atc.WorkerResourceType{
-							Type:    "custom-type",
-							Version: "some-version",
-						},
-					},
-				}
-				_, err := database.SaveWorker(workerInfo, 5*time.Minute)
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			It("returns true", func() {
-				workerVersion, found, err := database.FindWorkerCheckResourceTypeVersion("some-worker", "custom-type")
-				Expect(found).To(BeTrue())
-				Expect(err).NotTo(HaveOccurred())
-				Expect(workerVersion).To(Equal("some-version"))
-			})
-		})
-
-		Context("when container version does not match worker's", func() {
-			BeforeEach(func() {
-				workerInfo := db.WorkerInfo{
-					Name: "some-worker",
-					ResourceTypes: []atc.WorkerResourceType{
-						atc.WorkerResourceType{
-							Type:    "custom-type",
-							Version: "other-version",
-						},
-					},
-				}
-
-				_, err := database.SaveWorker(workerInfo, 5*time.Minute)
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			It("returns false", func() {
-				workerVersion, found, err := database.FindWorkerCheckResourceTypeVersion("some-worker", "custom-type")
-				Expect(found).To(BeTrue())
-				Expect(err).NotTo(HaveOccurred())
-				Expect(workerVersion).To(Equal("other-version"))
-			})
-		})
-
-		Context("when worker does not provide version for the resource type", func() {
-			BeforeEach(func() {
-				workerInfo := db.WorkerInfo{
-					Name: "some-worker",
-					ResourceTypes: []atc.WorkerResourceType{
-						atc.WorkerResourceType{
-							Type:    "some-type",
-							Version: "some-version",
-						},
-					},
-				}
-
-				_, err := database.SaveWorker(workerInfo, 5*time.Minute)
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			It("returns false", func() {
-				workerVersion, found, err := database.FindWorkerCheckResourceTypeVersion("some-worker", "custom-type")
-				Expect(found).To(BeFalse())
-				Expect(err).NotTo(HaveOccurred())
-				Expect(workerVersion).To(Equal(""))
-			})
-		})
 	})
 })
 

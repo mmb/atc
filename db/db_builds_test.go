@@ -9,6 +9,7 @@ import (
 
 	"github.com/concourse/atc"
 	"github.com/concourse/atc/db"
+	"github.com/concourse/atc/db/dbfakes"
 	"github.com/concourse/atc/event"
 )
 
@@ -54,14 +55,17 @@ var _ = Describe("Builds", func() {
 		Eventually(listener.Ping, 5*time.Second).ShouldNot(HaveOccurred())
 		bus := db.NewNotificationsBus(listener, dbConn)
 
-		database = db.NewSQL(dbConn, bus)
+		pgxConn := postgresRunner.OpenPgx()
+		fakeConnector := new(dbfakes.FakeConnector)
+		retryableConn := &db.RetryableConn{Connector: fakeConnector, Conn: pgxConn}
+
+		lockFactory := db.NewLockFactory(retryableConn)
+		database = db.NewSQL(dbConn, bus, lockFactory)
 		_, err := database.CreateTeam(db.Team{Name: "some-team"})
 		Expect(err).NotTo(HaveOccurred())
 
-		teamDBFactory := db.NewTeamDBFactory(dbConn, bus)
+		teamDBFactory := db.NewTeamDBFactory(dbConn, bus, lockFactory)
 		teamDB = teamDBFactory.GetTeamDB("some-team")
-
-		pipelineDBFactory = db.NewPipelineDBFactory(dbConn, bus)
 
 		config = atc.Config{
 			Jobs: atc.JobConfigs{
@@ -94,7 +98,7 @@ var _ = Describe("Builds", func() {
 		pipeline, _, err = teamDB.SaveConfig("some-pipeline", config, db.ConfigVersion(1), db.PipelineUnpaused)
 		Expect(err).NotTo(HaveOccurred())
 
-		pipelineDBFactory := db.NewPipelineDBFactory(dbConn, bus)
+		pipelineDBFactory = db.NewPipelineDBFactory(dbConn, bus, lockFactory)
 		pipelineDB = pipelineDBFactory.Build(pipeline)
 	})
 
@@ -131,11 +135,13 @@ var _ = Describe("Builds", func() {
 		err = savedBuild3.Finish(db.StatusSucceeded)
 		Expect(err).NotTo(HaveOccurred())
 
-		someJob, err := pipelineDB.GetJob("some-job")
+		someJob, found, err := pipelineDB.GetJob("some-job")
 		Expect(err).NotTo(HaveOccurred())
+		Expect(found).To(BeTrue())
 
-		someRandomJob, err := pipelineDB.GetJob("some-random-job")
+		someRandomJob, found, err := pipelineDB.GetJob("some-random-job")
 		Expect(err).NotTo(HaveOccurred())
+		Expect(found).To(BeTrue())
 
 		jobBuildMap, err := database.FindLatestSuccessfulBuildsPerJob()
 		Expect(err).NotTo(HaveOccurred())
@@ -157,8 +163,9 @@ var _ = Describe("Builds", func() {
 			Expect(found).To(BeTrue())
 			Expect(err).NotTo(HaveOccurred())
 
-			job, err := pipelineDB.GetJob("some-job")
+			job, found, err := pipelineDB.GetJob("some-job")
 			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(BeTrue())
 
 			Expect(jobID).To(Equal(job.ID))
 		})
@@ -185,7 +192,7 @@ var _ = Describe("Builds", func() {
 			publicPipeline, _, err := teamDB.SaveConfig("public-pipeline", config, db.ConfigVersion(1), db.PipelineUnpaused)
 			Expect(err).NotTo(HaveOccurred())
 			publicPipelineDB := pipelineDBFactory.Build(publicPipeline)
-			publicPipelineDB.Reveal()
+			publicPipelineDB.Expose()
 
 			publicBuild, err = publicPipelineDB.CreateJobBuild("some-job")
 			Expect(err).NotTo(HaveOccurred())
